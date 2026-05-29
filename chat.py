@@ -1,173 +1,181 @@
-import streamlit as st
+﻿import streamlit as st
+import time
 
-st.markdown("""
-<style>
-/* Chat flotante fijo */
-.chat-fijo {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 9999;
-}
-.chat-boton {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: #1a4a6f;
-    color: white;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-.chat-boton:hover {
-    transform: scale(1.05);
-}
-.chat-ventana {
-    position: fixed;
-    bottom: 90px;
-    right: 20px;
-    width: 350px;
-    height: 500px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-}
-.chat-header {
-    background: #1a4a6f;
-    color: white;
-    padding: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.chat-cerrar {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-}
-.chat-mensajes {
-    flex: 1;
-    overflow: auto;
-    padding: 10px;
-    background: #f5f5f5;
-}
-.mensaje-usuario {
-    background: #1a4a6f;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 15px;
-    margin: 5px 0;
-    text-align: right;
-    max-width: 80%;
-    margin-left: auto;
-    width: fit-content;
-}
-.mensaje-bot {
-    background: white;
-    color: black;
-    padding: 8px 12px;
-    border-radius: 15px;
-    margin: 5px 0;
-    border: 1px solid #ddd;
-    max-width: 80%;
-    width: fit-content;
-}
-.chat-input-area {
-    padding: 10px;
-    display: flex;
-    gap: 10px;
-    background: white;
-    border-top: 1px solid #ddd;
-}
-.chat-input-area input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 20px;
-}
-.chat-input-area button {
-    padding: 8px 16px;
-    background: #1a4a6f;
-    color: white;
-    border: none;
-    border-radius: 20px;
-    cursor: pointer;
-}
-</style>
-
-<div class="chat-fijo">
-    <button class="chat-boton" id="abrirChat">??</button>
-    <div class="chat-ventana" id="ventanaChat">
+def chat_floating_button():
+    st.markdown("""
+    <style>
+    /* Botón flotante animado */
+    .float-chat {
+        position: fixed;
+        bottom: 25px;
+        right: 25px;
+        width: 65px;
+        height: 65px;
+        background: linear-gradient(135deg, #0b3b5f, #1b5a7a);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+        border: none;
+        color: white;
+        font-size: 32px;
+    }
+    .float-chat:hover {
+        transform: scale(1.08);
+        background: linear-gradient(135deg, #0a2e4a, #124a64);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    /* Ventana del chat */
+    .chat-window {
+        position: fixed;
+        bottom: 100px;
+        right: 25px;
+        width: 380px;
+        height: 550px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        z-index: 999;
+        overflow: hidden;
+        font-family: 'Segoe UI', sans-serif;
+        transition: all 0.2s;
+        border: 1px solid #ddd;
+    }
+    .chat-header {
+        background: linear-gradient(90deg, #0b3b5f, #1b5a7a);
+        color: white;
+        padding: 12px 15px;
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .chat-close {
+        cursor: pointer;
+        font-size: 22px;
+        font-weight: bold;
+    }
+    .chat-messages {
+        flex: 1;
+        padding: 12px;
+        overflow-y: auto;
+        background: #f4f7fb;
+    }
+    .message {
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        border-radius: 18px;
+        max-width: 85%;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    .user {
+        background: #1b5a7a;
+        color: white;
+        margin-left: auto;
+        text-align: right;
+        border-bottom-right-radius: 4px;
+    }
+    .bot {
+        background: white;
+        color: #1e2a3a;
+        border: 1px solid #dce4ec;
+        margin-right: auto;
+        border-bottom-left-radius: 4px;
+    }
+    .chat-input-area {
+        display: flex;
+        padding: 12px;
+        border-top: 1px solid #e2e8f0;
+        background: white;
+    }
+    .chat-input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #cbd5e0;
+        border-radius: 30px;
+        font-size: 14px;
+        outline: none;
+    }
+    .chat-send {
+        background: #0b3b5f;
+        border: none;
+        color: white;
+        border-radius: 30px;
+        padding: 8px 18px;
+        margin-left: 8px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    </style>
+    
+    <div id="floatChatBtn" class="float-chat">💬</div>
+    <div id="chatWindow" class="chat-window" style="display: none;">
         <div class="chat-header">
-            <span>?? Asistente SST</span>
-            <button class="chat-cerrar" id="cerrarChat">?</button>
+            <span>🤖 Asistente SST Guía</span>
+            <span id="closeChat" class="chat-close">×</span>
         </div>
-        <div class="chat-mensajes" id="mensajesChat">
-            <div class="mensaje-bot">?? Hola! Soy tu asistente SST. ?En que puedo ayudarte?</div>
+        <div id="chatMessages" class="chat-messages">
+            <div class="message bot">¡Hola! Soy tu asistente guía de SST. Cuéntame sobre tu empresa y riesgos, y te ayudaré a construir todo el sistema.</div>
         </div>
         <div class="chat-input-area">
-            <input type="text" id="inputChat" placeholder="Escribe tu mensaje...">
-            <button id="enviarChat">Enviar</button>
+            <input type="text" id="chatInput" class="chat-input" placeholder="Escribe tu mensaje...">
+            <button id="sendChat" class="chat-send">Enviar</button>
         </div>
     </div>
-</div>
-
-<script>
-    const abrir = document.getElementById('abrirChat');
-    const cerrar = document.getElementById('cerrarChat');
-    const ventana = document.getElementById('ventanaChat');
-    const enviar = document.getElementById('enviarChat');
-    const input = document.getElementById('inputChat');
-    const mensajes = document.getElementById('mensajesChat');
     
-    // Abrir chat
-    abrir.onclick = function() {
-        ventana.style.display = 'flex';
-    };
+    <script>
+    const btn = document.getElementById('floatChatBtn');
+    const win = document.getElementById('chatWindow');
+    const closeBtn = document.getElementById('closeChat');
+    const sendBtn = document.getElementById('sendChat');
+    const input = document.getElementById('chatInput');
+    const messagesDiv = document.getElementById('chatMessages');
     
-    // Cerrar chat
-    cerrar.onclick = function() {
-        ventana.style.display = 'none';
-    };
+    btn.onclick = () => { win.style.display = 'flex'; };
+    closeBtn.onclick = () => { win.style.display = 'none'; };
     
-    // Enviar mensaje
-    function enviarMensaje() {
+    async function sendMessage() {
         const msg = input.value.trim();
-        if(msg === "") return;
-        
-        // Mensaje del usuario
-        const userDiv = document.createElement('div');
-        userDiv.className = 'mensaje-usuario';
-        userDiv.innerText = msg;
-        mensajes.appendChild(userDiv);
-        
+        if (!msg) return;
+        // mostrar mensaje usuario
+        messagesDiv.innerHTML += `<div class="message user">${escapeHtml(msg)}</div>`;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
         input.value = '';
-        mensajes.scrollTop = mensajes.scrollHeight;
+        // indicador
+        messagesDiv.innerHTML += `<div class="message bot" id="typing">🤔 Pensando...</div>`;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
-        // Respuesta del bot
-        const botDiv = document.createElement('div');
-        botDiv.className = 'mensaje-bot';
-        botDiv.innerText = '?? Gracias por tu mensaje! Pronto tendremos respuestas con IA.';
-        mensajes.appendChild(botDiv);
-        mensajes.scrollTop = mensajes.scrollHeight;
+        try {
+            const response = await fetch('/_stcore/guide-chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg})
+            });
+            const data = await response.json();
+            document.getElementById('typing')?.remove();
+            messagesDiv.innerHTML += `<div class="message bot">${escapeHtml(data.reply)}</div>`;
+        } catch(e) {
+            document.getElementById('typing')?.remove();
+            messagesDiv.innerHTML += `<div class="message bot">⚠️ Error de conexión</div>`;
+        }
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
     
-    enviar.onclick = enviarMensaje;
+    sendBtn.onclick = sendMessage;
+    input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
     
-    // Enter para enviar
-    input.onkeypress = function(e) {
-        if(e.key === 'Enter') {
-            enviarMensaje();
-        }
-    };
-    
-    // Iniciar cerrado
-    ventana.style.display = 'none';
-</script>
-""", unsafe_allow_html=True)
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    </script>
+    """, unsafe_allow_html=True)
