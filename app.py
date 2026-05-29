@@ -116,33 +116,16 @@ def calcular_progreso():
     if len(st.session_state.incidentes) > 0: completadas += 1
     return int((completadas / 6) * 100)
 
-# ==================== CSS COMPLETO CON DISEÑO ORIGINAL ====================
+# ==================== CSS COMPLETO ====================
 st.markdown("""
 <style>
-    /* Animaciones */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideIn {
-        from { transform: translateX(-30px); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-    }
-    @keyframes glow {
-        0% { box-shadow: 0 0 5px rgba(102,126,234,0.5); }
-        100% { box-shadow: 0 0 20px rgba(102,126,234,0.8); }
-    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @keyframes glow { 0% { box-shadow: 0 0 5px rgba(102,126,234,0.5); } 100% { box-shadow: 0 0 20px rgba(102,126,234,0.8); } }
     
-    /* Fondo principal */
-    .stApp {
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important;
-    }
+    .stApp { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important; }
     
-    /* Header principal */
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 2rem;
@@ -154,18 +137,6 @@ st.markdown("""
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
-    .main-header h1 {
-        font-size: 2.5rem;
-        margin: 0;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    .main-header p {
-        font-size: 1.1rem;
-        opacity: 0.9;
-    }
-    
-    /* Tarjetas de fase */
     .fase-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -174,33 +145,12 @@ st.markdown("""
         margin: 0.5rem;
         text-align: center;
         transition: all 0.3s;
-        cursor: pointer;
         animation: fadeIn 0.5s;
     }
+    .fase-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.2); }
+    .fase-completada { border: 2px solid #00ff00; background: rgba(0,255,0,0.1); }
+    .fase-actual { border: 2px solid #ffcc00; background: rgba(255,204,0,0.15); transform: scale(1.02); animation: glow 1.5s infinite; }
     
-    .fase-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255,255,255,0.2);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-    
-    .fase-completada {
-        border: 2px solid #00ff00;
-        background: rgba(0,255,0,0.1);
-    }
-    
-    .fase-actual {
-        border: 2px solid #ffcc00;
-        background: rgba(255,204,0,0.15);
-        transform: scale(1.02);
-        animation: glow 1.5s infinite;
-    }
-    
-    .fase-pendiente {
-        border: 2px solid rgba(255,255,255,0.3);
-    }
-    
-    /* Tarjetas de métricas */
     .metric-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -209,22 +159,9 @@ st.markdown("""
         text-align: center;
         color: white;
         transition: all 0.3s;
-        cursor: pointer;
-        animation: fadeIn 0.5s;
     }
+    .metric-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.2); }
     
-    .metric-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255,255,255,0.2);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-    
-    .metric-card h2 {
-        font-size: 2rem;
-        margin: 0;
-    }
-    
-    /* Tarjetas de pasos */
     .step-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -234,40 +171,16 @@ st.markdown("""
         border-left: 4px solid #667eea;
         transition: all 0.3s;
     }
+    .step-card:hover { transform: translateX(10px); background: rgba(255,255,255,0.15); }
     
-    .step-card:hover {
-        transform: translateX(10px);
-        background: rgba(255,255,255,0.15);
-    }
+    .riesgo-I { background: rgba(255,0,0,0.2); border-left: 4px solid #ff0000; }
+    .riesgo-II { background: rgba(255,102,0,0.2); border-left: 4px solid #ff6600; }
+    .riesgo-III { background: rgba(255,204,0,0.2); border-left: 4px solid #ffcc00; }
+    .riesgo-IV { background: rgba(0,255,0,0.2); border-left: 4px solid #00ff00; }
     
-    /* Tarjetas de riesgo */
-    .riesgo-I {
-        background: rgba(255,0,0,0.2);
-        border-left: 4px solid #ff0000;
-    }
-    .riesgo-II {
-        background: rgba(255,102,0,0.2);
-        border-left: 4px solid #ff6600;
-    }
-    .riesgo-III {
-        background: rgba(255,204,0,0.2);
-        border-left: 4px solid #ffcc00;
-    }
-    .riesgo-IV {
-        background: rgba(0,255,0,0.2);
-        border-left: 4px solid #00ff00;
-    }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f2027, #203a43); }
+    [data-testid="stSidebar"] * { color: white; }
     
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f2027, #203a43);
-    }
-    
-    [data-testid="stSidebar"] * {
-        color: white;
-    }
-    
-    /* Botones */
     .stButton > button {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
@@ -277,13 +190,8 @@ st.markdown("""
         transition: all 0.3s;
         width: 100%;
     }
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
     
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102,126,234,0.4);
-    }
-    
-    /* Login */
     .login-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -293,7 +201,6 @@ st.markdown("""
         animation: fadeIn 0.6s;
     }
     
-    /* Footer */
     .footer {
         text-align: center;
         padding: 1rem;
@@ -302,34 +209,6 @@ st.markdown("""
         border-top: 1px solid rgba(255,255,255,0.1);
     }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 0.5rem 1rem;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-    }
-    
-    /* Dataframe */
-    .dataframe {
-        background: rgba(255,255,255,0.05) !important;
-        color: white !important;
-    }
-    
-    /* Mensajes IA */
     .ia-message-user {
         background: linear-gradient(135deg, #667eea, #764ba2);
         border-radius: 15px;
@@ -338,7 +217,6 @@ st.markdown("""
         color: white;
         animation: slideIn 0.3s;
     }
-    
     .ia-message-bot {
         background: rgba(102,126,234,0.2);
         border-radius: 15px;
@@ -348,7 +226,6 @@ st.markdown("""
         animation: slideIn 0.3s;
     }
     
-    /* Badge de fase */
     .fase-badge {
         background: linear-gradient(135deg, #667eea, #764ba2);
         padding: 0.5rem 1rem;
@@ -361,14 +238,13 @@ st.markdown("""
 
 def mostrar_fases():
     fases = [
-        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍", "color": "#4ECDC4"},
-        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️", "color": "#FFB347"},
-        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊", "color": "#45B7D1"},
-        {"num": 4, "nombre": "Plan de Acción", "icono": "📋", "color": "#96CEB4"},
-        {"num": 5, "nombre": "Implementación", "icono": "🚀", "color": "#FFEAA7"},
-        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈", "color": "#FF6B6B"}
+        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍"},
+        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️"},
+        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊"},
+        {"num": 4, "nombre": "Plan de Acción", "icono": "📋"},
+        {"num": 5, "nombre": "Implementación", "icono": "🚀"},
+        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈"}
     ]
-    
     st.markdown("### 📍 Mapa del Proyecto - Ciclo PHVA")
     cols = st.columns(6)
     for i, fase in enumerate(fases):
@@ -381,14 +257,7 @@ def mostrar_fases():
             elif fase["num"] == 5 and len(st.session_state.capacitaciones) > 0: completada = True
             elif fase["num"] == 6 and len(st.session_state.incidentes) > 0: completada = True
             clase = "fase-actual" if fase["num"] == st.session_state.fase_actual else "fase-completada" if completada else "fase-pendiente"
-            st.markdown(f'''
-            <div class="fase-card {clase}">
-                <h2>{fase["icono"]}</h2>
-                <h4>Fase {fase["num"]}</h4>
-                <p><small>{fase["nombre"]}</small></p>
-                <h3>{"✅" if completada else "○"}</h3>
-            </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="fase-card {clase}"><h2>{fase["icono"]}</h2><h4>Fase {fase["num"]}</h4><p><small>{fase["nombre"]}</small></p>{"✅" if completada else "○"}</div>', unsafe_allow_html=True)
     st.progress(calcular_progreso() / 100)
     st.caption(f"**Progreso total:** {calcular_progreso()}% completado")
 
@@ -399,117 +268,182 @@ def login_screen():
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=100)
         st.markdown("<h1>🔄 SG-SST PHVA</h1>", unsafe_allow_html=True)
         st.markdown("<h3>Ciclo PHVA - 6 Fases Completas</h3>", unsafe_allow_html=True)
-        st.markdown("<p>Sistema de Gestión de Seguridad y Salud en el Trabajo</p>", unsafe_allow_html=True)
-        
         with st.form("login_form"):
             username = st.text_input("👤 Usuario")
             password = st.text_input("🔒 Contraseña", type="password")
-            if st.form_submit_button("🚀 Ingresar al Sistema", use_container_width=True):
+            if st.form_submit_button("🚀 Ingresar", use_container_width=True):
                 if username.lower() == "admin" and password.lower() == "sst2024":
                     st.session_state.authenticated = True
                     st.session_state.username = username
                     st.rerun()
                 else:
-                    st.error("❌ Credenciales incorrectas")
-                    st.info("📝 Use: **admin** / **sst2024**")
-        
+                    st.error("❌ Use: admin / sst2024")
         if FIREBASE_CONECTADO:
-            st.success("☁️ Conectado a Firebase Cloud")
-        else:
-            st.info("📡 Modo Local - Datos guardados localmente")
-        
+            st.success("☁️ Conectado a Firebase")
         st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown("---")
-        st.caption("👨‍💻 Desarrolladores: Ing. Jan Benitez & Ing. Neiris Pallares")
+        st.caption("👨‍💻 Ing. Jan Benitez & Ing. Neiris Pallares")
 
 def dashboard():
-    st.markdown('''
-    <div class="main-header">
-        <h1>📊 Dashboard SG-SST PHVA</h1>
-        <p>Planificar → Hacer → Verificar → Actuar</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
+    st.markdown('<div class="main-header"><h1>📊 Dashboard SG-SST PHVA</h1><p>Planificar → Hacer → Verificar → Actuar</p></div>', unsafe_allow_html=True)
     mostrar_fases()
     st.markdown("---")
-    
     col1, col2, col3, col4, col5, col6 = st.columns(6)
-    
-    with col1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>🔍</h2>", unsafe_allow_html=True)
-        st.metric("Fase 1", "✅" if st.session_state.empresa.get("nombre") else "⏳", "Diagnóstico")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>⚠️</h2>", unsafe_allow_html=True)
-        st.metric("Fase 2", f"{len(st.session_state.peligros)}", "Peligros")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📊</h2>", unsafe_allow_html=True)
-        st.metric("Fase 3", f"{len(st.session_state.matriz_riesgos)}", "Riesgos")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📋</h2>", unsafe_allow_html=True)
-        st.metric("Fase 4", f"{len(st.session_state.plan_accion)}", "Acciones")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>🚀</h2>", unsafe_allow_html=True)
-        st.metric("Fase 5", f"{len(st.session_state.capacitaciones)}", "Capacitaciones")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col6:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📈</h2>", unsafe_allow_html=True)
-        st.metric("Fase 6", f"{len(st.session_state.incidentes)}", "Incidentes")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
+    with col1: st.markdown('<div class="metric-card"><h2>🔍</h2><h3>Fase 1</h3><p>✅' + ("✅" if st.session_state.empresa.get("nombre") else "⏳") + '</p></div>', unsafe_allow_html=True)
+    with col2: st.markdown('<div class="metric-card"><h2>⚠️</h2><h3>Fase 2</h3><p>' + str(len(st.session_state.peligros)) + '</p></div>', unsafe_allow_html=True)
+    with col3: st.markdown('<div class="metric-card"><h2>📊</h2><h3>Fase 3</h3><p>' + str(len(st.session_state.matriz_riesgos)) + '</p></div>', unsafe_allow_html=True)
+    with col4: st.markdown('<div class="metric-card"><h2>📋</h2><h3>Fase 4</h3><p>' + str(len(st.session_state.plan_accion)) + '</p></div>', unsafe_allow_html=True)
+    with col5: st.markdown('<div class="metric-card"><h2>🚀</h2><h3>Fase 5</h3><p>' + str(len(st.session_state.capacitaciones)) + '</p></div>', unsafe_allow_html=True)
+    with col6: st.markdown('<div class="metric-card"><h2>📈</h2><h3>Fase 6</h3><p>' + str(len(st.session_state.incidentes)) + '</p></div>', unsafe_allow_html=True)
     st.markdown("---")
-    
-    # Gráfico de progreso
-    fig = go.Figure(data=[go.Bar(
-        x=['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4', 'Fase 5', 'Fase 6'],
-        y=[
-            100 if st.session_state.empresa.get("nombre") else 0,
-            min(100, len(st.session_state.peligros) * 33),
-            min(100, len(st.session_state.matriz_riesgos) * 33),
-            min(100, len(st.session_state.plan_accion) * 33),
-            min(100, len(st.session_state.capacitaciones) * 33),
-            min(100, len(st.session_state.incidentes) * 33)
-        ],
-        marker_color=['#4ECDC4', '#FFB347', '#45B7D1', '#96CEB4', '#FFEAA7', '#FF6B6B'],
-        text_auto=True
-    )])
-    fig.update_layout(
-        title="Progreso por Fase del Proyecto",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(255,255,255,0.1)',
-        font_color='white',
-        xaxis_title="Fases del Ciclo PHVA",
-        yaxis_title="Porcentaje Completado (%)",
-        height=500
-    )
+    fig = go.Figure(data=[go.Bar(x=['F1','F2','F3','F4','F5','F6'], y=[100 if st.session_state.empresa.get("nombre") else 0, min(100, len(st.session_state.peligros)*33), min(100, len(st.session_state.matriz_riesgos)*33), min(100, len(st.session_state.plan_accion)*33), min(100, len(st.session_state.capacitaciones)*33), min(100, len(st.session_state.incidentes)*33)], marker_color=['#4ECDC4','#FFB347','#45B7D1','#96CEB4','#FFEAA7','#FF6B6B'])])
+    fig.update_layout(title="Progreso por Fase", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.1)', font_color='white')
     st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Recomendación
-    fases_recomendaciones = [
-        "🎯 Comienza registrando la información de tu empresa en la Fase 1",
-        "⚠️ Identifica los peligros por proceso según metodología GTC-45",
-        "📊 Evalúa probabilidad (1-4) y severidad (1-3) de cada peligro",
-        "📋 Define acciones correctivas con responsables y fechas límite",
-        "🚀 Programa capacitaciones y ejecuta el plan de acción",
-        "📈 Monitorea indicadores y reporta incidentes oportunamente"
-    ]
-    st.info(f"**🎯 Próxima acción recomendada:** {fases_recomendaciones[st.session_state.fase_actual-1]}")
+
+# ==================== FASE 1: DIAGNÓSTICO ====================
+def fase1_diagnostico():
+    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico Inicial</h1><p>Registra la información de tu empresa</p></div>', unsafe_allow_html=True)
+    with st.form("fase1_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nombre = st.text_input("🏢 Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
+            nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
+        with col2:
+            trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=st.session_state.empresa.get("trabajadores", 45))
+            ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
+        if st.form_submit_button("💾 Guardar", use_container_width=True):
+            st.session_state.empresa["nombre"] = nombre
+            st.session_state.empresa["nit"] = nit
+            st.session_state.empresa["trabajadores"] = trabajadores
+            st.session_state.empresa["ciudad"] = ciudad
+            st.success("✅ Fase 1 completada")
+            st.session_state.fase_actual = 2
+            st.rerun()
+
+# ==================== FASE 2: PELIGROS ====================
+def fase2_peligros():
+    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros</h1><p>Metodología GTC-45</p></div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Nuevo Peligro"])
+    with tab1:
+        if st.session_state.peligros:
+            df = pd.DataFrame(st.session_state.peligros)
+            st.dataframe(df, use_container_width=True)
+            if st.button("✅ Avanzar a Fase 3", use_container_width=True):
+                st.session_state.fase_actual = 3
+                st.rerun()
+        else:
+            st.info("No hay peligros identificados")
+    with tab2:
+        with st.form("nuevo_peligro"):
+            col1, col2 = st.columns(2)
+            with col1:
+                proceso = st.selectbox("Proceso", ["Administrativo", "Operativo", "Mantenimiento", "Logística"])
+                peligro = st.text_area("Descripción del peligro")
+                tipo = st.selectbox("Tipo", ["Biológico", "Físico", "Químico", "Psicosocial", "Ergonómico", "Mecánico"])
+            with col2:
+                probabilidad = st.select_slider("Probabilidad (1-4)", options=[1,2,3,4])
+                severidad = st.select_slider("Severidad (1-3)", options=[1,2,3])
+                nivel = calcular_nivel_riesgo(probabilidad, severidad)
+                st.info(f"**Nivel calculado:** {nivel}")
+            controles = st.text_area("Controles existentes")
+            if st.form_submit_button("✅ Identificar", use_container_width=True):
+                if peligro:
+                    st.session_state.peligros.append({"proceso": proceso, "peligro": peligro, "tipo": tipo, "probabilidad": probabilidad, "severidad": severidad, "nivel": nivel, "controles": controles})
+                    st.success(f"✅ Peligro nivel {nivel} identificado")
+                    st.rerun()
+
+# ==================== FASE 3: RIESGOS ====================
+def fase3_riesgos():
+    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación de Riesgos</h1><p>Análisis detallado</p></div>', unsafe_allow_html=True)
+    if st.session_state.peligros:
+        for p in st.session_state.peligros:
+            riesgo_clase = f"riesgo-{p['nivel']}"
+            st.markdown(f'<div class="step-card {riesgo_clase}"><h4>📍 {p["peligro"]}</h4><p>Proceso: {p["proceso"]} | Prob: {p["probabilidad"]} | Sev: {p["severidad"]}</p><p><strong>Nivel: {p["nivel"]}</strong></p></div>', unsafe_allow_html=True)
+        if st.button("✅ Completar Evaluación", use_container_width=True):
+            st.session_state.matriz_riesgos = st.session_state.peligros.copy()
+            st.session_state.fase_actual = 4
+            st.success("¡Fase 3 completada!")
+            st.rerun()
+    else:
+        st.warning("⚠️ Primero identifica peligros en la Fase 2")
+
+# ==================== FASE 4: PLAN DE ACCIÓN ====================
+def fase4_plan_accion():
+    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción</h1><p>Define acciones correctivas</p></div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["📋 Plan Actual", "➕ Nueva Acción"])
+    with tab1:
+        if st.session_state.plan_accion:
+            df = pd.DataFrame(st.session_state.plan_accion)
+            st.dataframe(df, use_container_width=True)
+            if st.button("✅ Completar Plan", use_container_width=True):
+                st.session_state.fase_actual = 5
+                st.success("¡Fase 4 completada!")
+                st.rerun()
+    with tab2:
+        with st.form("nueva_accion"):
+            accion = st.text_area("Acción correctiva")
+            responsable = st.text_input("Responsable")
+            fecha = st.date_input("Fecha límite", datetime.now() + timedelta(days=30))
+            if st.form_submit_button("Agregar", use_container_width=True):
+                if accion:
+                    st.session_state.plan_accion.append({"accion": accion, "responsable": responsable, "fecha": str(fecha), "estado": "Pendiente"})
+                    st.success("✅ Acción agregada")
+                    st.rerun()
+
+# ==================== FASE 5: IMPLEMENTACIÓN ====================
+def fase5_implementacion():
+    st.markdown('<div class="main-header"><h1>🚀 Fase 5: Implementación</h1><p>Ejecuta el plan de acción</p></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📚 Capacitaciones")
+        with st.form("nueva_capacitacion"):
+            tema = st.text_input("Tema")
+            fecha = st.date_input("Fecha", datetime.now() + timedelta(days=7))
+            if st.form_submit_button("Programar"):
+                if tema:
+                    st.session_state.capacitaciones.append({"tema": tema, "fecha": str(fecha), "estado": "Programada"})
+                    st.success("✅ Programada")
+                    st.rerun()
+    with col2:
+        st.subheader("✅ Ejecución")
+        if len(st.session_state.capacitaciones) >= 1:
+            if st.button("✅ Completar Implementación"):
+                st.session_state.fase_actual = 6
+                st.success("¡Fase 5 completada!")
+                st.rerun()
+
+# ==================== FASE 6: SEGUIMIENTO ====================
+def fase6_seguimiento():
+    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento y Control</h1><p>Monitorea indicadores</p></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📊 Indicadores")
+        st.metric("Capacitaciones", len(st.session_state.capacitaciones))
+    with col2:
+        st.subheader("📋 Incidentes")
+        with st.form("nuevo_incidente"):
+            descripcion = st.text_area("Descripción")
+            if st.form_submit_button("Reportar"):
+                if descripcion:
+                    st.session_state.incidentes.append({"descripcion": descripcion, "fecha": str(datetime.now())})
+                    st.success("✅ Reportado")
+                    st.rerun()
+
+# ==================== ASISTENTE IA ====================
+def asistente_ia():
+    st.markdown('<div class="main-header"><h1>🤖 Asistente IA</h1><p>Experto virtual en SST</p></div>', unsafe_allow_html=True)
+    mostrar_fases()
+    if not st.session_state.ia_messages:
+        st.session_state.ia_messages = [{"role": "assistant", "content": f"**🤖 Hola!** Estamos en Fase {st.session_state.fase_actual}. Progreso: {calcular_progreso()}%. ¿En qué te ayudo?"}]
+    for msg in st.session_state.ia_messages:
+        if msg["role"] == "user":
+            st.markdown(f'<div class="ia-message-user">👤 {msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="ia-message-bot">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
+    if prompt := st.chat_input("Consulta sobre SST..."):
+        st.session_state.ia_messages.append({"role": "user", "content": prompt})
+        respuesta = f"**Progreso:** {calcular_progreso()}% - Fase {st.session_state.fase_actual}. Consulta recibida: '{prompt}'"
+        st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
+        st.rerun()
 
 # ==================== MAIN ====================
 if not st.session_state.authenticated:
@@ -518,49 +452,15 @@ else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
         st.markdown("### 🔄 SG-SST PHVA")
-        st.markdown(f"**👤 Usuario:** {st.session_state.username}")
-        
-        if FIREBASE_CONECTADO:
-            st.success("☁️ Cloud Sync")
-        
+        st.markdown(f"**👤** {st.session_state.username}")
         st.markdown("---")
-        
         fases_nombres = {1:"🔍 Diagnóstico", 2:"⚠️ Peligros", 3:"📊 Riesgos", 4:"📋 Plan", 5:"🚀 Implementación", 6:"📈 Seguimiento"}
-        
-        st.markdown(f'''
-        <div class="fase-badge">
-            <strong>📍 FASE ACTUAL</strong><br>
-            {fases_nombres[st.session_state.fase_actual]}
-        </div>
-        ''', unsafe_allow_html=True)
-        
+        st.markdown(f'<div class="fase-badge"><strong>📍 FASE ACTUAL</strong><br>{fases_nombres[st.session_state.fase_actual]}</div>', unsafe_allow_html=True)
         st.progress(calcular_progreso() / 100)
-        st.caption(f"**{calcular_progreso()}% completado**")
-        
         st.markdown("---")
-        
-        menu = st.radio(
-            "📋 **Módulos del Sistema**",
-            [
-                "📊 Dashboard",
-                "🔍 Fase 1: Diagnóstico",
-                "⚠️ Fase 2: Peligros GTC-45",
-                "📊 Fase 3: Evaluación de Riesgos",
-                "📋 Fase 4: Plan de Acción",
-                "🚀 Fase 5: Implementación",
-                "📈 Fase 6: Seguimiento",
-                "🤖 Asistente IA"
-            ],
-            index=0
-        )
-        
+        menu = st.radio("📋 Módulos", ["📊 Dashboard", "🔍 Fase 1: Diagnóstico", "⚠️ Fase 2: Peligros", "📊 Fase 3: Riesgos", "📋 Fase 4: Plan de Acción", "🚀 Fase 5: Implementación", "📈 Fase 6: Seguimiento", "🤖 Asistente IA"])
         st.markdown("---")
-        st.caption("**👨‍💻 Desarrolladores:**")
-        st.caption("Ing. Jan Benitez")
-        st.caption("Ing. Neiris Pallares")
-        st.markdown("---")
-        st.caption("📌 **Ciclo PHVA Continuo**")
-        
+        st.caption("👨‍💻 Ing. Jan Benitez & Ing. Neiris Pallares")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.authenticated = False
             st.rerun()
@@ -568,34 +468,18 @@ else:
     if menu == "📊 Dashboard":
         dashboard()
     elif menu == "🔍 Fase 1: Diagnóstico":
-        st.header("🔍 Fase 1: Diagnóstico")
-        with st.form("fase1"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nombre = st.text_input("Empresa", value=st.session_state.empresa.get("nombre", ""))
-            with col2:
-                trabajadores = st.number_input("Trabajadores", value=st.session_state.empresa.get("trabajadores", 45))
-            if st.form_submit_button("Guardar"):
-                st.session_state.empresa["nombre"] = nombre
-                st.session_state.empresa["trabajadores"] = trabajadores
-                st.success("✅ Guardado")
-                st.rerun()
-    elif menu == "⚠️ Fase 2: Peligros GTC-45":
-        st.header("⚠️ Fase 2: Peligros")
-        with st.form("nuevo_peligro"):
-            peligro = st.text_input("Peligro")
-            if st.form_submit_button("Guardar"):
-                st.session_state.peligros.append({"peligro": peligro, "nivel": "II"})
-                st.success("✅ Guardado")
-                st.rerun()
-        st.dataframe(pd.DataFrame(st.session_state.peligros))
-    else:
-        st.info("🚧 Módulo en desarrollo - Próximamente")
+        fase1_diagnostico()
+    elif menu == "⚠️ Fase 2: Peligros":
+        fase2_peligros()
+    elif menu == "📊 Fase 3: Riesgos":
+        fase3_riesgos()
+    elif menu == "📋 Fase 4: Plan de Acción":
+        fase4_plan_accion()
+    elif menu == "🚀 Fase 5: Implementación":
+        fase5_implementacion()
+    elif menu == "📈 Fase 6: Seguimiento":
+        fase6_seguimiento()
+    elif menu == "🤖 Asistente IA":
+        asistente_ia()
 
-st.markdown('''
-<div class="footer">
-    <p>SG-SST PHVA - Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
-    <p>Ciclo PHVA: Planificar → Hacer → Verificar → Actuar</p>
-    <p>© 2024 - Todos los derechos reservados</p>
-</div>
-''', unsafe_allow_html=True)
+st.markdown('<div class="footer"><p>SG-SST PHVA - Sistema de Gestión SST © 2024</p></div>', unsafe_allow_html=True)
