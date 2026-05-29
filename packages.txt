@@ -1,0 +1,3 @@
+﻿# Dependencias del sistema para Streamlit Cloud
+build-essential
+python3-dev

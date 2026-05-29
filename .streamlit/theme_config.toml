@@ -1,0 +1,5 @@
+﻿[TEMA_CONFIG]
+color_principal = "#00a86b"
+color_secundario = "#0a2b3e"
+modo_oscuro = false
+diseño = "material"
