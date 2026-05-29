@@ -361,12 +361,12 @@ st.markdown("""
 
 def mostrar_fases():
     fases = [
-        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍", "color": "#4ECDC4"},
-        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️", "color": "#FFB347"},
-        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊", "color": "#45B7D1"},
-        {"num": 4, "nombre": "Plan de Acción", "icono": "📋", "color": "#96CEB4"},
-        {"num": 5, "nombre": "Implementación", "icono": "🚀", "color": "#FFEAA7"},
-        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈", "color": "#FF6B6B"}
+        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍"},
+        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️"},
+        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊"},
+        {"num": 4, "nombre": "Plan de Acción", "icono": "📋"},
+        {"num": 5, "nombre": "Implementación", "icono": "🚀"},
+        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈"}
     ]
     
     st.markdown("### 📍 Mapa del Proyecto - Ciclo PHVA")
