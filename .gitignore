@@ -15,3 +15,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Firebase credentials
+firebase-credentials.json
