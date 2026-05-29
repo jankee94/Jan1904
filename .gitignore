@@ -1,0 +1,17 @@
+﻿# Secrets - NUNCA SUBIR A GITHUB
+secrets.toml
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backups
+*.bak
+*.backup
+*.tmp
+
+# IDE
+.vscode/
+.idea/
