@@ -1,14 +1,24 @@
-﻿[theme]
+# Crear archivo con formato correcto
+New-Item -ItemType Directory -Force -Path ".streamlit" | Out-Null
+
+# Contenido correcto (SIN caracteres especiales raros)
+$correctContent = @"
+[theme]
 base = "dark"
 primaryColor = "#667eea"
-backgroundColor = "#0f2027"
-secondaryBackgroundColor = "#203a43"
-textColor = "#ffffff"
 
 [server]
 maxUploadSize = 10
-enableXsrfProtection = true
-enableCORS = false
+"@
 
-[browser]
-gatherUsageStats = false
+# Guardar con encoding UTF8 sin BOM
+[System.IO.File]::WriteAllText(".streamlit/config.toml", $correctContent)
+
+# Verificar contenido
+Write-Host "Contenido guardado:" -ForegroundColor Yellow
+Get-Content ".streamlit/config.toml"
+
+# Subir
+git add .streamlit/config.toml
+git commit -m "Configuracion toml correcta"
+git push origin main
