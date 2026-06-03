@@ -26,13 +26,13 @@ if "capacitaciones" not in st.session_state:
 if "incidentes" not in st.session_state:
     st.session_state.incidentes = []
 if "empresa" not in st.session_state:
-    st.session_state.empresa = {"nombre": "", "trabajadores": 1, "nit": "", "ciudad": "", "sector": "Construcción"}
+    st.session_state.empresa = {"nombre": "", "trabajadores": 0, "nit": "", "ciudad": "", "sector": "Construcción"}
 if "plan_accion" not in st.session_state:
     st.session_state.plan_accion = []
 if "matriz_riesgos" not in st.session_state:
     st.session_state.matriz_riesgos = []
-if "ia_messages" not in st.session_state:
-    st.session_state.ia_messages = []
+if "diagnostico_generado" not in st.session_state:
+    st.session_state.diagnostico_generado = ""
 
 # ==================== FUNCIONES ====================
 def calcular_nivel_riesgo(p, s):
@@ -44,7 +44,7 @@ def calcular_nivel_riesgo(p, s):
 
 def calcular_progreso():
     completadas = 0
-    if st.session_state.empresa.get("nombre", "").strip() != "":
+    if st.session_state.empresa.get("nombre", "").strip() != "" and st.session_state.empresa.get("trabajadores", 0) > 0:
         completadas += 1
     if len(st.session_state.peligros) > 0:
         completadas += 1
@@ -59,25 +59,20 @@ def calcular_progreso():
     return int((completadas / 6) * 100)
 
 # ==================== IA REAL CON GEMINI ====================
-def llamar_gemini(prompt, contexto):
+def llamar_gemini(prompt):
     """Llama a la API real de Gemini"""
     try:
-        # Usar la API key que proporcionaste
-        api_key = "AQ.Ab8RN6J9BC82KvoGQ5zszMaC928G_Cde8YthACLC0CVzWE3PhQ"
+        # Intentar obtener API key desde secrets o usarla directamente
+        try:
+            api_key = st.secrets["gemini"]["api_key"]
+        except:
+            api_key = "AQ.Ab8RN6J9BC82KvoGQ5zszMaC928G_Cde8YthACLC0CVzWE3PhQ"
         
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         
         payload = {
             "contents": [{
-                "parts": [{"text": f"""
-Eres un experto en Seguridad y Salud en el Trabajo (SST). 
-Contexto del proyecto:
-{contexto}
-
-El usuario pregunta: {prompt}
-
-Responde de manera profesional, clara y útil usando los datos del contexto. Si el usuario pide un diagnóstico, genera un análisis completo.
-"""}]
+                "parts": [{"text": prompt}]
             }]
         }
         
@@ -92,74 +87,77 @@ Responde de manera profesional, clara y útil usando los datos del contexto. Si 
     except Exception as e:
         return None
 
-def generar_diagnostico_ia():
-    """Genera diagnóstico usando Gemini real"""
+def generar_diagnostico_con_ia():
+    """Genera diagnóstico usando Gemini con los datos actuales de la empresa"""
     empresa = st.session_state.empresa
     nombre = empresa.get("nombre", "").strip()
-    if not nombre:
-        return "⚠️ Primero registra los datos de tu empresa en la Fase 1."
+    nit = empresa.get("nit", "No registrado")
+    trabajadores = empresa.get("trabajadores", 0)
+    ciudad = empresa.get("ciudad", "No registrada")
+    sector = empresa.get("sector", "Construcción")
     
-    contexto = f"""
+    if not nombre or trabajadores == 0:
+        return "⚠️ **No se puede generar el diagnóstico.**\n\nPor favor, completa los siguientes datos en la Fase 1:\n- Nombre de la empresa\n- Número de trabajadores\n- Ciudad\n- Sector económico"
+    
+    prompt = f"""Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia.
+
 DATOS DE LA EMPRESA:
 - Nombre: {nombre}
-- NIT: {empresa.get('nit', 'No registrado')}
-- Sector: {empresa.get('sector', 'No especificado')}
-- Trabajadores: {empresa.get('trabajadores', 0)}
-- Ciudad: {empresa.get('ciudad', 'No registrada')}
+- NIT: {nit}
+- Sector: {sector}
+- Número de trabajadores: {trabajadores}
+- Ciudad: {ciudad}
 
-PROGRESO ACTUAL:
-- Progreso total: {calcular_progreso()}%
-- Fase actual: {st.session_state.fase_actual}/6
-- Peligros identificados: {len(st.session_state.peligros)}
-- Capacitaciones programadas: {len(st.session_state.capacitaciones)}
-- Incidentes reportados: {len(st.session_state.incidentes)}
-- Acciones planificadas: {len(st.session_state.plan_accion)}
+Genera un DIAGNÓSTICO INICIAL DE SEGURIDAD Y SALUD EN EL TRABAJO para esta empresa.
+
+El diagnóstico debe incluir:
+1. ANÁLISIS DE RIESGOS POR SECTOR: Describe los principales peligros según el sector {sector}
+2. NORMATIVA APLICABLE: Menciona las leyes y decretos aplicables (Ley 1562/12, Decreto 1072/15, Resolución 0312/19)
+3. RECOMENDACIONES INMEDIATAS: Acciones prioritarias a implementar
+4. PRÓXIMOS PASOS: Qué debe hacer la empresa para cumplir con SST
+
+Sé claro, profesional y práctico. Usa viñetas y formato amigable.
 """
     
-    prompt = "Genera un diagnóstico completo para esta empresa, incluyendo análisis de riesgos según su sector, recomendaciones inmediatas y próximos pasos."
-    
-    respuesta = llamar_gemini(prompt, contexto)
+    respuesta = llamar_gemini(prompt)
     
     if respuesta:
-        return f"**🤖 DIAGNÓSTICO GENERADO POR IA (GEMINI)**\n\n{respuesta}"
+        return f"**📋 DIAGNÓSTICO GENERADO POR IA (GEMINI)**\n\n{respuesta}"
     else:
-        return "⚠️ Error al conectar con Gemini. Verifica la API key."
+        return f"""**📋 DIAGNÓSTICO - {nombre.upper()}** (Generado localmente)
 
-def responder_ia(prompt):
-    """Responde usando Gemini real"""
-    empresa = st.session_state.empresa
-    nombre = empresa.get("nombre", "").strip()
-    
-    contexto = f"""
-DATOS DEL PROYECTO:
-- Empresa: {nombre if nombre else 'No registrada'}
-- Sector: {empresa.get('sector', 'No especificado')}
-- Trabajadores: {empresa.get('trabajadores', 0)}
-- Progreso: {calcular_progreso()}%
-- Fase actual: {st.session_state.fase_actual}/6
-- Peligros: {len(st.session_state.peligros)}
-- Capacitaciones: {len(st.session_state.capacitaciones)}
-- Incidentes: {len(st.session_state.incidentes)}
-"""
-    
-    respuesta = llamar_gemini(prompt, contexto)
-    
-    if respuesta:
-        return f"**🤖 IA GEMINI RESPONDE:**\n\n{respuesta}"
-    else:
-        # Fallback local si Gemini no responde
-        return f"""**⚠️ IA en modo local (Gemini no disponible)**
+**📊 DATOS DE LA EMPRESA:**
+- Nombre: {nombre}
+- NIT: {nit}
+- Sector: {sector}
+- Trabajadores: {trabajadores}
+- Ciudad: {ciudad}
 
-**Datos actuales:**
-- Empresa: {nombre if nombre else 'No registrada'}
-- Progreso: {calcular_progreso()}%
-- Fase: {st.session_state.fase_actual}/6
-- Peligros: {len(st.session_state.peligros)}
+**⚠️ ANÁLISIS DE RIESGOS POR SECTOR ({sector}):**
+- Identificar peligros específicos según la actividad económica
+- Evaluar condiciones de trabajo actuales
+- Revisar programas de salud ocupacional existentes
 
-**¿Qué puedes hacer?**
-- Completa el registro en Fase 1
-- Identifica peligros en Fase 2
-- Pregunta "diagnóstico" para intentar conectar Gemini nuevamente"""
+**📜 NORMATIVA APLICABLE:**
+- Ley 1562 de 2012 - Sistema General de Riesgos Laborales
+- Decreto 1072 de 2015 - Único Reglamentario del Sector Trabajo
+- Resolución 0312 de 2019 - Estándares mínimos SST
+
+**✅ RECOMENDACIONES INMEDIATAS:**
+1. Registrar la empresa en el SG-SST
+2. Conformar el Comité Paritario de SST (COPASST)
+3. Realizar matriz de peligros GTC-45
+4. Programar capacitaciones obligatorias
+5. Afiliar trabajadores a ARL
+
+**🚀 PRÓXIMOS PASOS:**
+Completar las 6 fases del sistema SG-SST PHVA:
+1. Diagnóstico ✓
+2. Identificación de peligros (Fase 2)
+3. Evaluación de riesgos (Fase 3)
+4. Plan de acción (Fase 4)
+5. Implementación (Fase 5)
+6. Seguimiento (Fase 6)"""
 
 # ==================== CSS ====================
 st.markdown("""
@@ -263,12 +261,12 @@ st.markdown("""
     
     .stProgress > div > div { background-color: #667eea; }
     
-    .ia-status {
-        background: linear-gradient(135deg, #00b4db, #0083b0);
-        padding: 0.5rem;
+    .diagnostico-box {
+        background: linear-gradient(135deg, #667eea20, #764ba220);
+        border-left: 4px solid #ff6600;
+        padding: 1rem;
         border-radius: 10px;
-        text-align: center;
-        margin-bottom: 1rem;
+        margin: 1rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -287,7 +285,7 @@ def mostrar_fases():
     for i, fase in enumerate(fases):
         with cols[i]:
             completada = False
-            if fase["num"] == 1 and st.session_state.empresa.get("nombre", "").strip() != "":
+            if fase["num"] == 1 and st.session_state.empresa.get("nombre", "").strip() != "" and st.session_state.empresa.get("trabajadores", 0) > 0:
                 completada = True
             elif fase["num"] == 2 and len(st.session_state.peligros) > 0:
                 completada = True
@@ -335,7 +333,7 @@ def dashboard():
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("🔍 Fase 1", "✅" if st.session_state.empresa.get("nombre", "").strip() else "⏳")
+        st.metric("🔍 Fase 1", "✅" if st.session_state.empresa.get("nombre", "").strip() and st.session_state.empresa.get("trabajadores", 0) > 0 else "⏳")
         st.markdown('</div>', unsafe_allow_html=True)
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -359,7 +357,7 @@ def dashboard():
         st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    datos = [100 if st.session_state.empresa.get("nombre", "").strip() else 0,
+    datos = [100 if st.session_state.empresa.get("nombre", "").strip() and st.session_state.empresa.get("trabajadores", 0) > 0 else 0,
              min(100, len(st.session_state.peligros) * 33),
              min(100, len(st.session_state.matriz_riesgos) * 33),
              min(100, len(st.session_state.plan_accion) * 33),
@@ -370,103 +368,224 @@ def dashboard():
     fig.update_layout(title="Progreso por Fase", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.1)', font_color='white', height=400)
     st.plotly_chart(fig, use_container_width=True)
 
-# ==================== FASES ====================
+# ==================== FASE 1: DIAGNÓSTICO ====================
 def fase1_diagnostico():
-    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico Inicial</h1><p>Registra la información de tu empresa</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico Inicial</h1><p>Registra la información de tu empresa para generar el diagnóstico</p></div>', unsafe_allow_html=True)
     
-    with st.form("fase1"):
+    with st.form("fase1_form"):
         col1, col2 = st.columns(2)
         with col1:
-            nombre = st.text_input("🏢 Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
+            nombre = st.text_input("🏢 Nombre de la empresa*", value=st.session_state.empresa.get("nombre", ""))
             nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
         with col2:
-            trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=st.session_state.empresa.get("trabajadores", 1))
+            trabajadores = st.number_input("👥 Número de trabajadores*", min_value=1, value=st.session_state.empresa.get("trabajadores", 1))
             ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
-            sector = st.selectbox("🏭 Sector", ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"], 
+            sector = st.selectbox("🏭 Sector económico", 
+                                 ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"], 
                                  index=0 if not st.session_state.empresa.get("sector") else ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"].index(st.session_state.empresa.get("sector", "Construcción")))
         
-        if st.form_submit_button("💾 Guardar", use_container_width=True):
-            if nombre.strip():
+        submitted = st.form_submit_button("💾 Guardar y Generar Diagnóstico", use_container_width=True)
+        
+        if submitted:
+            if nombre.strip() and trabajadores >= 1:
                 st.session_state.empresa["nombre"] = nombre
                 st.session_state.empresa["nit"] = nit
                 st.session_state.empresa["trabajadores"] = trabajadores
                 st.session_state.empresa["ciudad"] = ciudad
                 st.session_state.empresa["sector"] = sector
-                st.success("✅ Información guardada")
+                st.success("✅ Información guardada correctamente")
+                
+                # Generar diagnóstico automáticamente
+                with st.spinner("🔄 Generando diagnóstico con IA..."):
+                    diagnostico = generar_diagnostico_con_ia()
+                    st.session_state.diagnostico_generado = diagnostico
+                
                 if st.session_state.fase_actual == 1:
                     st.session_state.fase_actual = 2
                     st.rerun()
             else:
-                st.error("El nombre es obligatorio")
+                st.error("❌ El nombre de la empresa y el número de trabajadores son obligatorios")
+    
+    # Mostrar diagnóstico si existe
+    if st.session_state.diagnostico_generado:
+        st.markdown("---")
+        st.markdown("### 📋 DIAGNÓSTICO GENERADO")
+        st.markdown(f'<div class="diagnostico-box">{st.session_state.diagnostico_generado}</div>', unsafe_allow_html=True)
+        
+        if st.button("🔄 Regenerar diagnóstico", use_container_width=True):
+            with st.spinner("🔄 Generando diagnóstico con IA..."):
+                st.session_state.diagnostico_generado = generar_diagnostico_con_ia()
+                st.rerun()
+    
+    elif st.session_state.empresa.get("nombre"):
+        st.markdown("---")
+        st.subheader("📋 Datos actuales")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Empresa:** {st.session_state.empresa.get('nombre')}")
+            st.write(f"**NIT:** {st.session_state.empresa.get('nit', 'No registrado')}")
+        with col2:
+            st.write(f"**Trabajadores:** {st.session_state.empresa.get('trabajadores')}")
+            st.write(f"**Ciudad:** {st.session_state.empresa.get('ciudad', 'No registrada')}")
+        
+        if st.button("📋 Generar diagnóstico ahora", use_container_width=True):
+            with st.spinner("🔄 Generando diagnóstico con IA..."):
+                st.session_state.diagnostico_generado = generar_diagnostico_con_ia()
+                st.rerun()
 
 def fase2_peligros():
-    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros</h1></div>', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
+    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros</h1><p>Metodología GTC-45</p></div>', unsafe_allow_html=True)
+    
+    tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Nuevo Peligro"])
     with tab1:
         if st.session_state.peligros:
             st.dataframe(pd.DataFrame(st.session_state.peligros), use_container_width=True)
-            if st.button("✅ Avanzar"):
+            if st.button("✅ Avanzar a Fase 3", use_container_width=True):
                 st.session_state.fase_actual = 3
                 st.rerun()
+        else:
+            st.info("No hay peligros identificados")
     with tab2:
         with st.form("nuevo_peligro"):
-            peligro = st.text_input("Descripción")
-            prob = st.slider("Probabilidad", 1, 4, 3)
-            sev = st.slider("Severidad", 1, 3, 2)
-            if st.form_submit_button("Identificar"):
+            col1, col2 = st.columns(2)
+            with col1:
+                proceso = st.selectbox("Proceso", ["Administrativo", "Operativo", "Mantenimiento", "Logística"])
+                peligro = st.text_input("Descripción del peligro")
+                tipo = st.selectbox("Tipo", ["Biológico", "Físico", "Químico", "Psicosocial", "Ergonómico", "Mecánico"])
+            with col2:
+                prob = st.slider("Probabilidad (1-4)", 1, 4, 3)
+                sev = st.slider("Severidad (1-3)", 1, 3, 2)
+                nivel = calcular_nivel_riesgo(prob, sev)
+                st.info(f"Nivel calculado: {nivel}")
+            controles = st.text_area("Controles existentes")
+            if st.form_submit_button("✅ Identificar Peligro", use_container_width=True):
                 if peligro:
-                    st.session_state.peligros.append({"peligro": peligro, "probabilidad": prob, "severidad": sev, "nivel": calcular_nivel_riesgo(prob, sev)})
+                    st.session_state.peligros.append({
+                        "proceso": proceso,
+                        "peligro": peligro,
+                        "tipo": tipo,
+                        "probabilidad": prob,
+                        "severidad": sev,
+                        "nivel": nivel,
+                        "controles": controles
+                    })
+                    st.success(f"✅ Peligro nivel {nivel} identificado")
                     st.rerun()
+                else:
+                    st.error("❌ Complete la descripción")
 
 def fase3_riesgos():
-    st.markdown('<div class="main-header"><h1>📊 Fase 3: Riesgos</h1></div>', unsafe_allow_html=True)
-    if st.button("Completar"):
-        st.session_state.matriz_riesgos = st.session_state.peligros.copy()
-        st.session_state.fase_actual = 4
-        st.rerun()
+    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación de Riesgos</h1></div>', unsafe_allow_html=True)
+    if st.session_state.peligros:
+        for p in st.session_state.peligros:
+            st.markdown(f"- {p['peligro']} (Nivel {p['nivel']})")
+        if st.button("✅ Completar evaluación", use_container_width=True):
+            st.session_state.matriz_riesgos = st.session_state.peligros.copy()
+            st.session_state.fase_actual = 4
+            st.rerun()
+    else:
+        st.warning("⚠️ Primero identifica peligros en la Fase 2")
 
 def fase4_plan_accion():
-    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan</h1></div>', unsafe_allow_html=True)
-    with st.form("nueva_accion"):
-        accion = st.text_input("Acción")
-        if st.form_submit_button("Agregar"):
-            st.session_state.plan_accion.append({"accion": accion})
-            st.rerun()
-    if st.button("Completar"):
-        st.session_state.fase_actual = 5
-        st.rerun()
+    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción</h1></div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["📋 Plan Actual", "➕ Nueva Acción"])
+    with tab1:
+        if st.session_state.plan_accion:
+            st.dataframe(pd.DataFrame(st.session_state.plan_accion), use_container_width=True)
+            if st.button("✅ Completar Plan", use_container_width=True):
+                st.session_state.fase_actual = 5
+                st.rerun()
+        else:
+            st.info("No hay acciones")
+    with tab2:
+        with st.form("nueva_accion"):
+            accion = st.text_area("Acción correctiva")
+            responsable = st.text_input("Responsable")
+            fecha = st.date_input("Fecha límite", datetime.now() + timedelta(days=30))
+            if st.form_submit_button("Agregar", use_container_width=True):
+                if accion:
+                    st.session_state.plan_accion.append({
+                        "accion": accion,
+                        "responsable": responsable,
+                        "fecha": str(fecha),
+                        "estado": "Pendiente"
+                    })
+                    st.rerun()
 
 def fase5_implementacion():
     st.markdown('<div class="main-header"><h1>🚀 Fase 5: Implementación</h1></div>', unsafe_allow_html=True)
-    with st.form("nueva_capacitacion"):
-        tema = st.text_input("Capacitación")
-        if st.form_submit_button("Programar"):
-            st.session_state.capacitaciones.append({"tema": tema})
-            st.rerun()
-    if st.button("Completar"):
-        st.session_state.fase_actual = 6
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📚 Capacitaciones")
+        with st.form("nueva_capacitacion"):
+            tema = st.text_input("Tema de capacitación")
+            fecha = st.date_input("Fecha", datetime.now() + timedelta(days=7))
+            if st.form_submit_button("Programar", use_container_width=True):
+                if tema:
+                    st.session_state.capacitaciones.append({"tema": tema, "fecha": str(fecha), "estado": "Programada"})
+                    st.rerun()
+        if st.session_state.capacitaciones:
+            for c in st.session_state.capacitaciones:
+                st.info(f"📅 {c['tema']} - {c['fecha']}")
+    with col2:
+        st.subheader("✅ Ejecución")
+        for i, a in enumerate(st.session_state.plan_accion):
+            if st.checkbox(f"✓ {a['accion'][:50]}", key=f"check_{i}"):
+                st.session_state.plan_accion[i]['estado'] = "Completada"
+        if len(st.session_state.capacitaciones) >= 1:
+            if st.button("✅ Completar Implementación", use_container_width=True):
+                st.session_state.fase_actual = 6
+                st.rerun()
 
 def fase6_seguimiento():
-    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento</h1></div>', unsafe_allow_html=True)
-    with st.form("nuevo_incidente"):
-        desc = st.text_input("Incidente")
-        if st.form_submit_button("Reportar"):
-            st.session_state.incidentes.append({"descripcion": desc})
-            st.rerun()
+    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento y Control</h1></div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📊 Indicadores")
+        st.metric("Capacitaciones", len(st.session_state.capacitaciones))
+        st.metric("Peligros", len(st.session_state.peligros))
+        st.metric("Acciones", len(st.session_state.plan_accion))
+    with col2:
+        st.subheader("📋 Incidentes")
+        with st.form("nuevo_incidente"):
+            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Casi accidente"])
+            descripcion = st.text_area("Descripción")
+            if st.form_submit_button("Reportar", use_container_width=True):
+                if descripcion:
+                    st.session_state.incidentes.append({"tipo": tipo, "descripcion": descripcion, "fecha": str(datetime.now())})
+                    st.rerun()
+        for i in st.session_state.incidentes:
+            st.warning(f"⚠️ {i['tipo']}: {i['descripcion'][:50]}...")
     if calcular_progreso() >= 90:
         st.balloons()
-        st.success("Completado")
+        st.success("🎉 ¡PROYECTO COMPLETADO!")
 
+# ==================== ASISTENTE IA ====================
 def asistente_ia():
     st.markdown('<div class="main-header"><h1>🤖 Asistente IA con Gemini</h1><p>IA real - Análisis inteligente de SST</p></div>', unsafe_allow_html=True)
     mostrar_fases()
     
-    # Estado de IA
-    st.markdown('<div class="ia-status">🤖 IA GEMINI ACTIVA - Generando respuestas inteligentes</div>', unsafe_allow_html=True)
-    
     if not st.session_state.ia_messages:
-        st.session_state.ia_messages = [{"role": "assistant", "content": "**🤖 ¡Hola! Soy tu asistente IA con Gemini.**\n\nPuedo ayudarte a analizar tu proyecto SST. Pregúntame:\n- 📋 **diagnóstico** - Análisis completo de tu empresa\n- 📊 **progreso** - Estado del proyecto\n- ⚠️ **peligros** - Recomendaciones de seguridad\n- 🏢 **empresa** - Datos de tu organización"}]
+        nombre_emp = st.session_state.empresa.get("nombre", "").strip()
+        if not nombre_emp:
+            nombre_emp = "aún no registrada"
+        bienvenida = f"""**🤖 ¡Hola! Soy tu asistente IA con Gemini.**
+
+**📊 DATOS ACTUALES:**
+- Empresa: **{nombre_emp}**
+- Trabajadores: **{st.session_state.empresa.get('trabajadores', 0)}**
+- Progreso: **{calcular_progreso()}%**
+- Fase: **{st.session_state.fase_actual}/6**
+
+**💬 ¿Qué puedes preguntarme?**
+- 🏢 **"empresa"** - Ver datos de tu empresa
+- 📊 **"progreso"** - Estado del proyecto
+- ⚠️ **"peligros"** - Riesgos identificados
+- 📋 **"diagnóstico"** - Generar diagnóstico completo con IA
+- 📚 **"capacitaciones"** - Programa de formación
+
+**¡Estoy conectado a Gemini!** 🚀"""
+        st.session_state.ia_messages = [{"role": "assistant", "content": bienvenida}]
     
     for msg in st.session_state.ia_messages:
         if msg["role"] == "user":
@@ -474,14 +593,53 @@ def asistente_ia():
         else:
             st.markdown(f'<div class="ia-message-bot">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
     
-    if prompt := st.chat_input("Escribe tu consulta..."):
+    if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
         
         with st.spinner("🧠 IA Gemini analizando..."):
             if "diagnóstico" in prompt.lower() or "diagnostico" in prompt.lower():
-                respuesta = generar_diagnostico_ia()
+                respuesta = generar_diagnostico_con_ia()
             else:
-                respuesta = responder_ia(prompt)
+                # Respuesta contextual según la pregunta
+                prompt_lower = prompt.lower()
+                if "empresa" in prompt_lower:
+                    respuesta = f"""**🏢 DATOS DE TU EMPRESA**
+
+- **Nombre:** {st.session_state.empresa.get('nombre', 'No registrada')}
+- **NIT:** {st.session_state.empresa.get('nit', 'No registrado')}
+- **Sector:** {st.session_state.empresa.get('sector', 'No especificado')}
+- **Trabajadores:** {st.session_state.empresa.get('trabajadores', 0)}
+- **Ciudad:** {st.session_state.empresa.get('ciudad', 'No registrada')}
+- **Progreso:** {calcular_progreso()}%
+- **Fase actual:** {st.session_state.fase_actual}/6"""
+                elif "progreso" in prompt_lower:
+                    respuesta = f"""**📊 PROGRESO DEL PROYECTO - {calcular_progreso()}%**
+
+- **Fase 1 (Diagnóstico):** ✅ Completada
+- **Fase 2 (Peligros):** {len(st.session_state.peligros)} peligros
+- **Fase 3 (Riesgos):** {len(st.session_state.matriz_riesgos)} evaluados
+- **Fase 4 (Plan):** {len(st.session_state.plan_accion)} acciones
+- **Fase 5 (Capacitaciones):** {len(st.session_state.capacitaciones)} programadas
+- **Fase 6 (Seguimiento):** {len(st.session_state.incidentes)} incidentes
+
+**Fase actual:** {st.session_state.fase_actual}/6"""
+                elif "peligro" in prompt_lower:
+                    if st.session_state.peligros:
+                        lista = "\n".join([f"- {p['peligro']} (Nivel {p['nivel']})" for p in st.session_state.peligros])
+                        respuesta = f"**⚠️ PELIGROS IDENTIFICADOS**\n\n{lista}\n\n**Total:** {len(st.session_state.peligros)} peligros."
+                    else:
+                        respuesta = "⚠️ No hay peligros registrados. Ve a la **Fase 2** para identificarlos."
+                else:
+                    respuesta = f"""**🤖 ASISTENTE IA**
+
+Puedo ayudarte con lo siguiente:
+
+- Escribe **"empresa"** para ver los datos de tu empresa
+- Escribe **"progreso"** para ver el avance del proyecto
+- Escribe **"peligros"** para ver los riesgos identificados
+- Escribe **"diagnóstico"** para generar un análisis completo con IA
+
+¿En qué más puedo ayudarte?"""
         
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
