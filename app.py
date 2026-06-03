@@ -37,7 +37,7 @@ if "diagnostico_generado" not in st.session_state:
 if "ia_messages" not in st.session_state:
     st.session_state.ia_messages = []
 
-# ==================== FUNCIONES IA CON SECRETS ====================
+# ==================== FUNCIONES PARA API KEYS ====================
 def get_gemini_key():
     try:
         return st.secrets["gemini"]["api_key"]
@@ -50,8 +50,8 @@ def get_groq_key():
     except:
         return None
 
+# ==================== FUNCIONES IA COMPLETAS ====================
 def llamar_gemini(prompt):
-    """Llama a Gemini API usando secret"""
     api_key = get_gemini_key()
     if not api_key:
         return None
@@ -67,7 +67,6 @@ def llamar_gemini(prompt):
         return None
 
 def llamar_groq(prompt):
-    """Llama a Groq API usando secret"""
     api_key = get_groq_key()
     if not api_key:
         return None
@@ -84,21 +83,16 @@ def llamar_groq(prompt):
         return None
 
 def generar_con_ia(prompt, contexto=""):
-    """Intenta Gemini, si falla usa Groq"""
     prompt_completo = f"{contexto}\n\n{prompt}" if contexto else prompt
-    
     respuesta = llamar_gemini(prompt_completo)
     if respuesta:
         return f"🤖 **IA Gemini:** {respuesta}"
-    
     respuesta = llamar_groq(prompt_completo)
     if respuesta:
         return f"🤖 **IA Groq:** {respuesta}"
-    
     return None
 
 def generar_diagnostico_ia():
-    """Genera diagnóstico usando IA con datos reales"""
     empresa = st.session_state.empresa
     nombre = empresa.get("nombre", "").strip()
     if not nombre or empresa.get("trabajadores", 0) < 1:
@@ -125,7 +119,6 @@ Incluye: análisis de riesgos, normativa aplicable, recomendaciones inmediatas y
         return generar_diagnostico_local()
 
 def generar_diagnostico_local():
-    """Diagnóstico local de respaldo"""
     empresa = st.session_state.empresa
     sector = empresa.get("sector", "Construcción")
     analisis = {
@@ -140,7 +133,6 @@ def generar_diagnostico_local():
 **Recomendaciones:** Conformar COPASST, matriz de peligros, capacitaciones anuales."""
 
 def recomendar_con_ia(tipo, datos_adicionales=""):
-    """IA recomienda acciones según el contexto"""
     prompts = {
         "peligro": f"Recomienda controles para este peligro: {datos_adicionales}",
         "capacitacion": f"Sector: {st.session_state.empresa.get('sector', 'General')}. Recomienda capacitaciones obligatorias en SST.",
@@ -274,10 +266,10 @@ def dashboard():
     fig = go.Figure(data=[go.Bar(x=['F1', 'F2', 'F3', 'F4', 'F5', 'F6'], y=datos, marker_color=['#4ECDC4','#FFB347','#45B7D1','#96CEB4','#FFEAA7','#FF6B6B'])])
     fig.update_layout(title="Progreso por Fase", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.1)', font_color='white', height=400)
     st.plotly_chart(fig, use_container_width=True)
-    st.markdown('<div class="ia-status">🤖 IA activa: Gemini + Groq (conecta en Settings → Secrets)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="ia-status">🤖 IA activa: Gemini + Groq</div>', unsafe_allow_html=True)
 
 def fase1_diagnostico():
-    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico IA</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico con IA</h1></div>', unsafe_allow_html=True)
     trabajadores_actual = st.session_state.empresa.get("trabajadores", 1)
     with st.form("fase1_form"):
         col1, col2 = st.columns(2)
@@ -289,11 +281,10 @@ def fase1_diagnostico():
             ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
             sector = st.selectbox("🏭 Sector", ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"], 
                                  index=0 if not st.session_state.empresa.get("sector") else ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"].index(st.session_state.empresa.get("sector", "Construcción")))
-        submitted = st.form_submit_button("💾 Guardar y Generar Diagnóstico con IA", use_container_width=True)
+        submitted = st.form_submit_button("💾 Guardar y Generar Diagnóstico con IA")
         if submitted and nombre.strip() and trabajadores >= 1:
             st.session_state.empresa = {"nombre": nombre, "nit": nit, "trabajadores": trabajadores, "ciudad": ciudad, "sector": sector}
-            st.success("✅ Datos guardados. Generando diagnóstico...")
-            with st.spinner("🧠 IA analizando..."):
+            with st.spinner("🧠 IA generando diagnóstico..."):
                 st.session_state.diagnostico_generado = generar_diagnostico_ia()
             if st.session_state.fase_actual == 1:
                 st.session_state.fase_actual = 2
@@ -303,8 +294,8 @@ def fase1_diagnostico():
         st.markdown(f'<div class="diagnostico-box">{st.session_state.diagnostico_generado}</div>', unsafe_allow_html=True)
 
 def fase2_peligros():
-    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros IA</h1></div>', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ IA Recomienda"])
+    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Peligros IA</h1></div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["📋 Lista", "🤖 IA Recomienda"])
     with tab1:
         if st.session_state.peligros:
             st.dataframe(pd.DataFrame(st.session_state.peligros), use_container_width=True)
@@ -313,34 +304,31 @@ def fase2_peligros():
                 st.rerun()
     with tab2:
         with st.form("peligro_ia"):
-            descripcion = st.text_area("Describe la actividad", height=100)
-            if st.form_submit_button("🤖 Recomendar con IA"):
-                if descripcion:
+            desc = st.text_area("Describe la actividad")
+            if st.form_submit_button("🤖 Recomendar"):
+                if desc:
                     with st.spinner("🧠 IA analizando..."):
-                        recomendacion = recomendar_con_ia("peligro", descripcion)
-                        st.info(recomendacion)
+                        st.info(recomendar_con_ia("peligro", desc))
 
 def fase3_riesgos():
-    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación IA</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>📊 Fase 3: Riesgos IA</h1></div>', unsafe_allow_html=True)
     if st.button("🤖 Evaluar con IA"):
         with st.spinner("🧠 IA evaluando..."):
-            analisis = recomendar_con_ia("accion", "")
-            st.info(analisis)
+            st.info(recomendar_con_ia("accion", ""))
     if st.button("✅ Completar evaluación"):
         st.session_state.matriz_riesgos = st.session_state.peligros.copy()
         st.session_state.fase_actual = 4
         st.rerun()
 
 def fase4_plan_accion():
-    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción IA</h1></div>', unsafe_allow_html=True)
-    if st.button("🤖 Recomendar acciones con IA"):
+    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan IA</h1></div>', unsafe_allow_html=True)
+    if st.button("🤖 Recomendar acciones"):
         with st.spinner("🧠 IA generando recomendaciones..."):
-            recomendaciones = recomendar_con_ia("accion", "")
-            st.info(recomendaciones)
+            st.info(recomendar_con_ia("accion", ""))
     with st.form("nueva_accion"):
         accion = st.text_area("Acción")
         if st.form_submit_button("Agregar") and accion:
-            st.session_state.plan_accion.append({"accion": accion, "estado": "Pendiente"})
+            st.session_state.plan_accion.append({"accion": accion})
             st.rerun()
     if st.button("✅ Completar Plan"):
         st.session_state.fase_actual = 5
@@ -348,10 +336,9 @@ def fase4_plan_accion():
 
 def fase5_implementacion():
     st.markdown('<div class="main-header"><h1>🚀 Fase 5: Capacitaciones IA</h1></div>', unsafe_allow_html=True)
-    if st.button("🤖 Recomendar capacitaciones con IA"):
+    if st.button("🤖 Recomendar capacitaciones"):
         with st.spinner("🧠 IA generando plan..."):
-            caps = recomendar_con_ia("capacitacion", "")
-            st.info(caps)
+            st.info(recomendar_con_ia("capacitacion", ""))
     with st.form("nueva_capacitacion"):
         tema = st.text_input("Tema")
         if st.form_submit_button("Programar") and tema:
@@ -374,18 +361,15 @@ def fase6_seguimiento():
         st.success("🎉 PROYECTO COMPLETADO")
 
 def asistente_ia():
-    st.markdown('<div class="main-header"><h1>🤖 Asistente IA Virtual</h1><p>Gemini + Groq</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>🤖 Asistente IA Virtual</h1></div>', unsafe_allow_html=True)
     mostrar_fases()
-    
     if not st.session_state.ia_messages:
-        st.session_state.ia_messages = [{"role": "assistant", "content": f"**🤖 ¡Hola!** Empresa: {st.session_state.empresa.get('nombre', 'No registrada')} | Progreso: {calcular_progreso()}%\n\nPregunta: diagnóstico, recomendaciones, peligros, capacitaciones"}]
-    
+        st.session_state.ia_messages = [{"role": "assistant", "content": f"**🤖 Hola!** Empresa: {st.session_state.empresa.get('nombre', 'No registrada')} | Progreso: {calcular_progreso()}%\n\nPregunta: diagnóstico, recomendaciones, peligros, capacitaciones"}]
     for msg in st.session_state.ia_messages:
         if msg["role"] == "user":
             st.markdown(f'<div class="ia-message-user">👤 {msg["content"]}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="ia-message-bot">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
-    
     if prompt := st.chat_input("Escribe tu consulta..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
         with st.spinner("🧠 IA pensando..."):
@@ -394,7 +378,7 @@ def asistente_ia():
             else:
                 respuesta = generar_con_ia(prompt, f"Contexto: {st.session_state.empresa.get('nombre')}")
                 if not respuesta:
-                    respuesta = f"Datos actuales: {calcular_progreso()}% completado. ¿Necesitas diagnóstico o recomendaciones?"
+                    respuesta = f"Datos: {calcular_progreso()}% completado. ¿Necesitas diagnóstico?"
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
 
