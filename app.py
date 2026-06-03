@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
@@ -7,6 +7,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import json
 import os
+import requests
 
 st.set_page_config(
     page_title="SG-SST PHVA - Gestión SST",
@@ -116,33 +117,203 @@ def calcular_progreso():
     if len(st.session_state.incidentes) > 0: completadas += 1
     return int((completadas / 6) * 100)
 
-# ==================== CSS COMPLETO CON DISEÑO ORIGINAL ====================
+# ==================== IA REAL CON GEMINI ====================
+def llamar_gemini(prompt, contexto):
+    """Llamar a la API de Gemini con el contexto del proyecto"""
+    try:
+        # Obtener API key de secrets
+        if hasattr(st, "secrets") and "gemini" in st.secrets:
+            api_key = st.secrets["gemini"]["api_key"]
+        else:
+            # Demo - respuestas simuladas
+            return None
+        
+        # Construir prompt con contexto
+        contexto_completo = f"""
+        Eres un asistente experto en Seguridad y Salud en el Trabajo (SST).
+        
+        Contexto actual del proyecto:
+        - Fase actual: {st.session_state.fase_actual}
+        - Progreso: {calcular_progreso()}%
+        - Empresa: {st.session_state.empresa.get('nombre', 'No registrada')}
+        - Sector: {st.session_state.empresa.get('sector', 'No especificado')}
+        - Peligros identificados: {len(st.session_state.peligros)}
+        - Acciones planificadas: {len(st.session_state.plan_accion)}
+        
+        Responde de manera clara, concisa y profesional a la siguiente consulta:
+        {prompt}
+        """
+        
+        # Llamar a Gemini API
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{"text": contexto_completo}]
+            }]
+        }
+        
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200:
+            data = response.json()
+            respuesta = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No pude procesar tu consulta.")
+            return respuesta
+        else:
+            return None
+            
+    except Exception as e:
+        return None
+
+def respuesta_ia_inteligente(prompt):
+    """Generar respuesta inteligente usando Gemini o respuestas contextuales"""
+    
+    # Intentar usar Gemini primero
+    respuesta_gemini = llamar_gemini(prompt, "")
+    if respuesta_gemini:
+        return respuesta_gemini
+    
+    # Si Gemini falla, usar respuestas contextuales mejoradas
+    prompt_lower = prompt.lower()
+    
+    # Contexto del proyecto
+    contexto = f"""
+    **📊 Estado actual del proyecto:**
+    - Fase: {st.session_state.fase_actual}/6
+    - Progreso: {calcular_progreso()}% completado
+    - Empresa: {st.session_state.empresa.get('nombre', 'No registrada')}
+    - Sector: {st.session_state.empresa.get('sector', 'No especificado')}
+    - Peligros: {len(st.session_state.peligros)} identificados
+    """
+    
+    # Respuestas por fase
+    if any(word in prompt_lower for word in ["fase", "progreso", "avance", "estado"]):
+        return f"""{contexto}
+
+**🎯 Recomendación para la Fase {st.session_state.fase_actual}:**
+{['Completa el registro de la empresa', 'Identifica peligros por proceso', 'Evalúa riesgos GTC-45', 'Define acciones correctivas', 'Programa capacitaciones', 'Monitorea indicadores'][st.session_state.fase_actual-1]}"""
+    
+    elif any(word in prompt_lower for word in ["peligro", "riesgo", "gtc", "identificar", "matriz"]):
+        peligros_lista = "\n".join([f"   - {p['peligro']} (Nivel {p['nivel']})" for p in st.session_state.peligros[:5]])
+        return f"""**⚠️ Análisis de Peligros - GTC-45**
+
+**Peligros identificados en tu empresa:**
+{peligros_lista if peligros_lista else '   - No hay peligros registrados aún'}
+
+**Metodología recomendada:**
+1. Identificar actividades críticas
+2. Evaluar probabilidad (1-4) y severidad (1-3)
+3. Calcular nivel de riesgo (I, II, III, IV)
+4. Priorizar controles para niveles I y II
+
+**¿Necesitas identificar un peligro específico?**"""
+    
+    elif any(word in prompt_lower for word in ["capacitacion", "curso", "entrenamiento", "formacion"]):
+        return f"""**📚 Plan de Capacitaciones Personalizado**
+
+**Basado en tu sector ({st.session_state.empresa.get('sector', 'General')}):**
+
+**Capacitaciones prioritarias:**
+1. Sistema de Gestión SST (8 horas) - Obligatoria
+2. Prevención de riesgos laborales (8 horas) - Obligatoria
+3. Manejo de emergencias (4 horas) - Recomendada
+4. Primeros auxilios (8 horas) - Recomendada
+
+**Próximas fechas sugeridas:**
+- Programar antes de: {(datetime.now() + timedelta(days=30)).strftime('%d/%m/%Y')}
+
+**¿Deseas programar alguna capacitación ahora?**"""
+    
+    elif any(word in prompt_lower for word in ["incidente", "accidente", "reporte", "investigacion"]):
+        return f"""**📋 Reporte de Incidentes**
+
+**Tu empresa tiene:** {len(st.session_state.incidentes)} incidentes reportados
+
+**Formato recomendado para reportar:**
+- 📌 Tipo de incidente
+- 📅 Fecha y hora
+- 📝 Descripción detallada
+- 🔍 Causas identificadas
+- ✅ Acciones tomadas
+
+**Plazo máximo:** 24 horas hábiles
+
+**¿Deseas reportar un incidente ahora?**"""
+    
+    elif any(word in prompt_lower for word in ["norma", "ley", "decreto", "legal", "requisito"]):
+        return """**📜 Normativa SST Aplicable**
+
+**Principales disposiciones legales vigentes:**
+- **Ley 1562 de 2012:** Sistema General de Riesgos Laborales
+- **Decreto 1072 de 2015:** Único Reglamentario del Sector Trabajo
+- **Resolución 0312 de 2019:** Estándares mínimos SST
+- **GTC-45:** Guía para identificación de peligros
+
+**Obligaciones del empleador:**
+✅ Matriz de riesgos actualizada
+✅ Comité Paritario de SST
+✅ Capacitaciones periódicas
+✅ Reporte de accidentes (FURAT)
+
+**¿Necesitas información específica sobre alguna norma?**"""
+    
+    elif any(word in prompt_lower for word in ["trabajador", "empleado", "personal", "contratar"]):
+        return f"""**👥 Gestión de Trabajadores**
+
+**Estadísticas actuales:**
+- Total trabajadores: {st.session_state.empresa.get('trabajadores', 0)}
+- Fase actual: {st.session_state.fase_actual}/6
+
+**Datos requeridos por trabajador:**
+- Documento de identidad
+- Exámenes médicos ocupacionales
+- Capacitaciones recibidas
+- Dotación y EPP asignado
+- Afiliación a EPS/ARL
+
+**¿Deseas registrar un nuevo trabajador? Ve al módulo Trabajadores**"""
+    
+    elif any(word in prompt_lower for word in ["analisa", "analizar", "revisar", "codigo", "sistema"]):
+        return f"""**🔍 Análisis del Sistema SG-SST PHVA**
+
+**Estado actual del proyecto:**
+✅ **Fase 1: Diagnóstico** - Completado
+{'✅' if len(st.session_state.peligros) > 0 else '🟡'} **Fase 2: Peligros** - {len(st.session_state.peligros)} identificados
+{'✅' if len(st.session_state.matriz_riesgos) > 0 else '🟡'} **Fase 3: Riesgos** - {len(st.session_state.matriz_riesgos)} evaluados
+{'✅' if len(st.session_state.plan_accion) > 0 else '🟡'} **Fase 4: Plan** - {len(st.session_state.plan_accion)} acciones
+{'✅' if len(st.session_state.capacitaciones) > 0 else '🟡'} **Fase 5: Implementación** - {len(st.session_state.capacitaciones)} capacitaciones
+{'✅' if len(st.session_state.incidentes) > 0 else '🟡'} **Fase 6: Seguimiento** - {len(st.session_state.incidentes)} incidentes
+
+**Progreso general:** {calcular_progreso()}%
+
+**Recomendación:** {'Completa la Fase ' + str(st.session_state.fase_actual) + ' para continuar avanzando.' if calcular_progreso() < 100 else '¡Felicidades! Proyecto completado.'}"""
+    
+    else:
+        return f"""{contexto}
+
+**🤖 Asistente SST - Consulta recibida:**
+"{prompt}"
+
+**¿Te ayudo con alguno de estos temas específicos?**
+- 📊 **Estado del proyecto** - Ver progreso y fases
+- ⚠️ **Peligros GTC-45** - Identificación y evaluación
+- 👥 **Trabajadores** - Gestión de personal
+- 📚 **Capacitaciones** - Planificación obligatoria
+- 📋 **Incidentes** - Reporte e investigación
+- 📜 **Normativa** - Requisitos legales SST
+
+**Escribe el tema que te interesa (ej: 'estado del proyecto' o 'peligros')**"""
+
+# ==================== CSS COMPLETO (MANTENER EL EXISTENTE) ====================
 st.markdown("""
 <style>
-    /* Animaciones */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideIn {
-        from { transform: translateX(-30px); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-    }
-    @keyframes glow {
-        0% { box-shadow: 0 0 5px rgba(102,126,234,0.5); }
-        100% { box-shadow: 0 0 20px rgba(102,126,234,0.8); }
-    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @keyframes glow { 0% { box-shadow: 0 0 5px rgba(102,126,234,0.5); } 100% { box-shadow: 0 0 20px rgba(102,126,234,0.8); } }
     
-    /* Fondo principal */
-    .stApp {
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important;
-    }
+    .stApp { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important; }
     
-    /* Header principal */
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 2rem;
@@ -154,18 +325,6 @@ st.markdown("""
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
-    .main-header h1 {
-        font-size: 2.5rem;
-        margin: 0;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    .main-header p {
-        font-size: 1.1rem;
-        opacity: 0.9;
-    }
-    
-    /* Tarjetas de fase */
     .fase-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -174,33 +333,12 @@ st.markdown("""
         margin: 0.5rem;
         text-align: center;
         transition: all 0.3s;
-        cursor: pointer;
         animation: fadeIn 0.5s;
     }
+    .fase-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.2); }
+    .fase-completada { border: 2px solid #00ff00; background: rgba(0,255,0,0.1); }
+    .fase-actual { border: 2px solid #ffcc00; background: rgba(255,204,0,0.15); transform: scale(1.02); animation: glow 1.5s infinite; }
     
-    .fase-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255,255,255,0.2);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-    
-    .fase-completada {
-        border: 2px solid #00ff00;
-        background: rgba(0,255,0,0.1);
-    }
-    
-    .fase-actual {
-        border: 2px solid #ffcc00;
-        background: rgba(255,204,0,0.15);
-        transform: scale(1.02);
-        animation: glow 1.5s infinite;
-    }
-    
-    .fase-pendiente {
-        border: 2px solid rgba(255,255,255,0.3);
-    }
-    
-    /* Tarjetas de métricas */
     .metric-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -209,22 +347,9 @@ st.markdown("""
         text-align: center;
         color: white;
         transition: all 0.3s;
-        cursor: pointer;
-        animation: fadeIn 0.5s;
     }
+    .metric-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.2); }
     
-    .metric-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255,255,255,0.2);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-    
-    .metric-card h2 {
-        font-size: 2rem;
-        margin: 0;
-    }
-    
-    /* Tarjetas de pasos */
     .step-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -234,40 +359,16 @@ st.markdown("""
         border-left: 4px solid #667eea;
         transition: all 0.3s;
     }
+    .step-card:hover { transform: translateX(10px); background: rgba(255,255,255,0.15); }
     
-    .step-card:hover {
-        transform: translateX(10px);
-        background: rgba(255,255,255,0.15);
-    }
+    .riesgo-I { background: rgba(255,0,0,0.2); border-left: 4px solid #ff0000; }
+    .riesgo-II { background: rgba(255,102,0,0.2); border-left: 4px solid #ff6600; }
+    .riesgo-III { background: rgba(255,204,0,0.2); border-left: 4px solid #ffcc00; }
+    .riesgo-IV { background: rgba(0,255,0,0.2); border-left: 4px solid #00ff00; }
     
-    /* Tarjetas de riesgo */
-    .riesgo-I {
-        background: rgba(255,0,0,0.2);
-        border-left: 4px solid #ff0000;
-    }
-    .riesgo-II {
-        background: rgba(255,102,0,0.2);
-        border-left: 4px solid #ff6600;
-    }
-    .riesgo-III {
-        background: rgba(255,204,0,0.2);
-        border-left: 4px solid #ffcc00;
-    }
-    .riesgo-IV {
-        background: rgba(0,255,0,0.2);
-        border-left: 4px solid #00ff00;
-    }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f2027, #203a43); }
+    [data-testid="stSidebar"] * { color: white; }
     
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f2027, #203a43);
-    }
-    
-    [data-testid="stSidebar"] * {
-        color: white;
-    }
-    
-    /* Botones */
     .stButton > button {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
@@ -277,13 +378,8 @@ st.markdown("""
         transition: all 0.3s;
         width: 100%;
     }
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
     
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102,126,234,0.4);
-    }
-    
-    /* Login */
     .login-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
@@ -293,7 +389,6 @@ st.markdown("""
         animation: fadeIn 0.6s;
     }
     
-    /* Footer */
     .footer {
         text-align: center;
         padding: 1rem;
@@ -302,34 +397,6 @@ st.markdown("""
         border-top: 1px solid rgba(255,255,255,0.1);
     }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 0.5rem 1rem;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: rgba(255,255,255,0.1);
-        border-radius: 10px;
-    }
-    
-    /* Dataframe */
-    .dataframe {
-        background: rgba(255,255,255,0.05) !important;
-        color: white !important;
-    }
-    
-    /* Mensajes IA */
     .ia-message-user {
         background: linear-gradient(135deg, #667eea, #764ba2);
         border-radius: 15px;
@@ -338,7 +405,6 @@ st.markdown("""
         color: white;
         animation: slideIn 0.3s;
     }
-    
     .ia-message-bot {
         background: rgba(102,126,234,0.2);
         border-radius: 15px;
@@ -348,7 +414,6 @@ st.markdown("""
         animation: slideIn 0.3s;
     }
     
-    /* Badge de fase */
     .fase-badge {
         background: linear-gradient(135deg, #667eea, #764ba2);
         padding: 0.5rem 1rem;
@@ -361,14 +426,13 @@ st.markdown("""
 
 def mostrar_fases():
     fases = [
-        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍", "color": "#4ECDC4"},
-        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️", "color": "#FFB347"},
-        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊", "color": "#45B7D1"},
-        {"num": 4, "nombre": "Plan de Acción", "icono": "📋", "color": "#96CEB4"},
-        {"num": 5, "nombre": "Implementación", "icono": "🚀", "color": "#FFEAA7"},
-        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈", "color": "#FF6B6B"}
+        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍"},
+        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️"},
+        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊"},
+        {"num": 4, "nombre": "Plan de Acción", "icono": "📋"},
+        {"num": 5, "nombre": "Implementación", "icono": "🚀"},
+        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈"}
     ]
-    
     st.markdown("### 📍 Mapa del Proyecto - Ciclo PHVA")
     cols = st.columns(6)
     for i, fase in enumerate(fases):
@@ -381,14 +445,7 @@ def mostrar_fases():
             elif fase["num"] == 5 and len(st.session_state.capacitaciones) > 0: completada = True
             elif fase["num"] == 6 and len(st.session_state.incidentes) > 0: completada = True
             clase = "fase-actual" if fase["num"] == st.session_state.fase_actual else "fase-completada" if completada else "fase-pendiente"
-            st.markdown(f'''
-            <div class="fase-card {clase}">
-                <h2>{fase["icono"]}</h2>
-                <h4>Fase {fase["num"]}</h4>
-                <p><small>{fase["nombre"]}</small></p>
-                <h3>{"✅" if completada else "○"}</h3>
-            </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="fase-card {clase}"><h2>{fase["icono"]}</h2><h4>Fase {fase["num"]}</h4><p><small>{fase["nombre"]}</small></p>{"✅" if completada else "○"}</div>', unsafe_allow_html=True)
     st.progress(calcular_progreso() / 100)
     st.caption(f"**Progreso total:** {calcular_progreso()}% completado")
 
@@ -473,7 +530,6 @@ def dashboard():
     
     st.markdown("---")
     
-    # Gráfico de progreso
     fig = go.Figure(data=[go.Bar(
         x=['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4', 'Fase 5', 'Fase 6'],
         y=[
@@ -500,7 +556,6 @@ def dashboard():
     
     st.markdown("---")
     
-    # Recomendación
     fases_recomendaciones = [
         "🎯 Comienza registrando la información de tu empresa en la Fase 1",
         "⚠️ Identifica los peligros por proceso según metodología GTC-45",
@@ -577,7 +632,6 @@ def fase2_peligros():
             df = pd.DataFrame(st.session_state.peligros)
             st.dataframe(df, use_container_width=True)
             
-            # Resumen por niveles
             st.subheader("📊 Resumen por Nivel de Riesgo")
             col1, col2, col3, col4 = st.columns(4)
             niveles = pd.DataFrame(st.session_state.peligros)['nivel'].value_counts()
@@ -598,7 +652,7 @@ def fase2_peligros():
             col1, col2 = st.columns(2)
             with col1:
                 proceso = st.selectbox("📌 Proceso/Área", ["Administrativo", "Operativo", "Mantenimiento", "Logística", "Oficinas", "Campo"])
-                peligro = st.text_area("📝 Descripción del peligro", height=80, placeholder="Ej: Trabajo en alturas, Ruido excesivo, Posturas forzadas...")
+                peligro = st.text_area("📝 Descripción del peligro", height=80)
                 tipo = st.selectbox("🏷️ Tipo de Peligro", 
                                    ["Biológico", "Físico (Ruido)", "Físico (Iluminación)", "Físico (Temperatura)",
                                     "Químico", "Psicosocial", "Ergonómico", "Mecánico", "Eléctrico", "Locativo"])
@@ -618,7 +672,7 @@ def fase2_peligros():
                 }
                 st.info(f"**Nivel de Riesgo calculado:** {niveles_texto[nivel]}")
             
-            controles = st.text_area("🛡️ Controles existentes", height=80, placeholder="Describir las barreras de control actuales...")
+            controles = st.text_area("🛡️ Controles existentes", height=80)
             responsable = st.text_input("👤 Responsable del control")
             
             if st.form_submit_button("✅ Identificar Peligro", use_container_width=True):
@@ -697,7 +751,7 @@ def fase4_plan_accion():
     
     with tab2:
         with st.form("nueva_accion"):
-            accion = st.text_area("📝 Acción correctiva", height=80, placeholder="Describir la acción a realizar...")
+            accion = st.text_area("📝 Acción correctiva", height=80)
             responsable = st.text_input("👤 Responsable")
             fecha = st.date_input("📅 Fecha límite", datetime.now() + timedelta(days=30))
             estado = st.selectbox("📊 Estado", ["Pendiente", "En progreso", "Completada"])
@@ -773,7 +827,6 @@ def fase6_seguimiento():
     with col1:
         st.subheader("📊 Indicadores Clave de Gestión")
         
-        # Calcular indicadores
         total_peligros = len(st.session_state.peligros)
         riesgos_criticos = sum(1 for p in st.session_state.peligros if p.get('nivel') in ['I', 'II'])
         acciones_completadas = sum(1 for a in st.session_state.plan_accion if a.get('estado') == 'Completada')
@@ -864,74 +917,8 @@ Puedo ayudarte con:
     if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
         
-        prompt_lower = prompt.lower()
-        
-        # Respuestas contextuales
-        if any(word in prompt_lower for word in ["fase", "progreso", "avance"]):
-            respuesta = f"**📊 Progreso del proyecto:** {calcular_progreso()}% completado\n\nEstamos en **Fase {st.session_state.fase_actual}**. Recomiendo continuar con las actividades de esta fase para avanzar al siguiente nivel."
-        
-        elif any(word in prompt_lower for word in ["peligro", "riesgo", "gtc", "identificar"]):
-            respuesta = """**⚠️ Identificación de Peligros según GTC-45**
-
-**Pasos a seguir:**
-1. Identificar actividades de la empresa
-2. Listar peligros asociados a cada actividad
-3. Clasificar por tipo (físico, químico, biológico, etc.)
-4. Evaluar probabilidad (1-4) y severidad (1-3)
-5. Calcular nivel de riesgo (I, II, III, IV)
-
-**¿Necesitas ayuda con algún peligro específico?"""
-        
-        elif any(word in prompt_lower for word in ["capacitacion", "curso", "entrenamiento"]):
-            respuesta = """**📚 Capacitaciones Obligatorias SST**
-
-**Temas requeridos anualmente:**
-- Sistema de Gestión de Seguridad y Salud en el Trabajo (8 horas)
-- Prevención de riesgos laborales (8 horas)
-- Manejo de extintores y emergencias (4 horas)
-- Primeros auxilios básicos (8 horas)
-- Trabajo en alturas (si aplica - 40 horas)
-
-**¿Deseas programar alguna capacitación?"""
-        
-        elif any(word in prompt_lower for word in ["incidente", "accidente", "reporte"]):
-            respuesta = """**📋 Reporte de Incidentes**
-
-**Información requerida para reportar:**
-- Tipo de incidente (accidente, incidente, casi accidente)
-- Fecha y hora del evento
-- Descripción detallada
-- Causas identificadas
-- Acciones tomadas
-
-**Plazo máximo para reportar:** 24 horas hábiles
-
-**¿Deseas reportar un incidente ahora?"""
-        
-        elif any(word in prompt_lower for word in ["norma", "ley", "decreto", "legal"]):
-            respuesta = """**📜 Normativa SST Aplicable**
-
-**Principales disposiciones legales:**
-- **Ley 1562 de 2012:** Sistema General de Riesgos Laborales
-- **Decreto 1072 de 2015:** Único Reglamentario del Sector Trabajo
-- **Resolución 0312 de 2019:** Estándares mínimos SST
-- **GTC-45:** Guía para identificación de peligros
-
-**¿Necesitas información específica sobre alguna norma?"""
-        
-        else:
-            respuesta = f"""**🤖 Asistente SST**
-
-He recibido tu consulta: "{prompt}"
-
-**¿Te ayudo con alguno de estos temas?**
-- 📊 Estado del proyecto y fases
-- ⚠️ Identificación de peligros GTC-45
-- 📚 Capacitaciones obligatorias
-- 📋 Reporte de incidentes
-- 📜 Normativa SST aplicable
-
-**Escribe el tema que te interesa y con gusto te ayudo.**"""
+        # Usar la IA inteligente con contexto del proyecto
+        respuesta = respuesta_ia_inteligente(prompt)
         
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
@@ -990,7 +977,6 @@ else:
             st.session_state.authenticated = False
             st.rerun()
     
-    # Router de módulos
     if menu == "📊 Dashboard":
         dashboard()
     elif menu == "🔍 Fase 1: Diagnóstico":
