@@ -121,6 +121,20 @@ def llamar_gemini(prompt):
     if not api_key:
         return None
     try:
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": api_key
+        }
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", None)
+        return None
+    except:
+        return None
+    try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         response = requests.post(url, json=payload, timeout=10)
@@ -540,3 +554,5 @@ else:
         asistente_ia()
 
 st.markdown('<div class="footer"><p>SG-SST PHVA - IA Gemini + Groq con validador integrado © 2024</p></div>', unsafe_allow_html=True)
+
+
