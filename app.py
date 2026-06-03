@@ -29,22 +29,11 @@ if "capacitaciones" not in st.session_state:
 if "incidentes" not in st.session_state:
     st.session_state.incidentes = []
 if "empresa" not in st.session_state:
-    st.session_state.empresa = {}
+    st.session_state.empresa = {"nombre": "", "trabajadores": 1}
 if "plan_accion" not in st.session_state:
     st.session_state.plan_accion = []
 if "matriz_riesgos" not in st.session_state:
     st.session_state.matriz_riesgos = []
-
-# Datos de ejemplo
-if not st.session_state.empresa:
-    st.session_state.empresa = {
-        "nombre": "",
-        "nit": "",
-        "sector": "Construcción",
-        "trabajadores": 0,
-        "ciudad": "",
-        "arl": "Positiva"
-    }
 
 # ==================== FUNCIONES ====================
 def calcular_nivel_riesgo(p, s):
@@ -70,38 +59,6 @@ def calcular_progreso():
         completadas += 1
     return int((completadas / 6) * 100)
 
-def avanzar_fase():
-    if st.session_state.fase_actual < 6:
-        st.session_state.fase_actual += 1
-        st.rerun()
-
-def responder_ia(prompt):
-    prompt_lower = prompt.lower()
-    
-    if "fase" in prompt_lower or "progreso" in prompt_lower:
-        return f"**📊 Progreso actual:** {calcular_progreso()}% completado. Estás en la Fase {st.session_state.fase_actual} de 6."
-    
-    elif "empresa" in prompt_lower:
-        if st.session_state.empresa.get("nombre"):
-            return f"**🏢 Información de la empresa:**\n- Nombre: {st.session_state.empresa.get('nombre')}\n- NIT: {st.session_state.empresa.get('nit')}\n- Sector: {st.session_state.empresa.get('sector')}\n- Trabajadores: {st.session_state.empresa.get('trabajadores')}\n- Ciudad: {st.session_state.empresa.get('ciudad')}"
-        else:
-            return "⚠️ Aún no has registrado la información de la empresa. Ve a la Fase 1: Diagnóstico."
-    
-    elif "peligro" in prompt_lower:
-        if st.session_state.peligros:
-            return f"**⚠️ Peligros identificados:** {len(st.session_state.peligros)} en total."
-        else:
-            return "⚠️ Aún no hay peligros identificados. Ve a la Fase 2."
-    
-    elif "capacitacion" in prompt_lower:
-        if st.session_state.capacitaciones:
-            return f"**📚 Capacitaciones programadas:** {len(st.session_state.capacitaciones)}"
-        else:
-            return "📚 Aún no hay capacitaciones programadas. Ve a la Fase 5."
-    
-    else:
-        return f"**🤖 Asistente IA**\n\nEstás en la Fase {st.session_state.fase_actual}. Progreso: {calcular_progreso()}%\n\nPregúntame sobre: fase, empresa, peligros, capacitaciones, incidentes o normas SST."
-
 # ==================== CSS ====================
 st.markdown("""
 <style>
@@ -113,22 +70,22 @@ st.markdown("""
     
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
+        padding: 1.5rem;
         border-radius: 20px;
         color: white;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         animation: slideIn 0.6s;
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
-    .main-header h1 { font-size: 2rem; margin: 0; }
-    .main-header p { font-size: 1rem; opacity: 0.9; }
+    .main-header h1 { font-size: 1.8rem; margin: 0; }
+    .main-header p { font-size: 0.9rem; opacity: 0.9; }
     
     .fase-card {
         background: rgba(255,255,255,0.1);
         backdrop-filter: blur(10px);
-        padding: 1rem;
+        padding: 0.8rem;
         border-radius: 15px;
         margin: 0.3rem;
         text-align: center;
@@ -212,12 +169,12 @@ st.markdown("""
 
 def mostrar_fases():
     fases = [
-        {"num": 1, "nombre": "Diagnóstico Inicial", "icono": "🔍"},
-        {"num": 2, "nombre": "Identificación de Peligros", "icono": "⚠️"},
-        {"num": 3, "nombre": "Evaluación de Riesgos", "icono": "📊"},
+        {"num": 1, "nombre": "Diagnóstico", "icono": "🔍"},
+        {"num": 2, "nombre": "Peligros GTC-45", "icono": "⚠️"},
+        {"num": 3, "nombre": "Evaluación Riesgos", "icono": "📊"},
         {"num": 4, "nombre": "Plan de Acción", "icono": "📋"},
         {"num": 5, "nombre": "Implementación", "icono": "🚀"},
-        {"num": 6, "nombre": "Seguimiento y Control", "icono": "📈"}
+        {"num": 6, "nombre": "Seguimiento", "icono": "📈"}
     ]
     st.markdown("### 📍 Mapa del Proyecto - Ciclo PHVA")
     cols = st.columns(6)
@@ -316,24 +273,16 @@ def fase1_diagnostico():
         with col1:
             nombre = st.text_input("🏢 Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
             nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
-            sector = st.selectbox("🏭 Sector económico", ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"], 
-                                 index=0 if not st.session_state.empresa.get("sector") else ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"].index(st.session_state.empresa.get("sector", "Construcción")))
         with col2:
             trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=st.session_state.empresa.get("trabajadores", 1))
             ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
-            arl = st.selectbox("🛡️ ARL", ["Positiva", "Sura", "Colpatria", "Bolívar"], 
-                              index=0 if not st.session_state.empresa.get("arl") else ["Positiva", "Sura", "Colpatria", "Bolívar"].index(st.session_state.empresa.get("arl", "Positiva")))
         
         if st.form_submit_button("💾 Guardar Diagnóstico", use_container_width=True):
             if nombre:
-                st.session_state.empresa = {
-                    "nombre": nombre,
-                    "nit": nit,
-                    "sector": sector,
-                    "trabajadores": trabajadores,
-                    "ciudad": ciudad,
-                    "arl": arl
-                }
+                st.session_state.empresa["nombre"] = nombre
+                st.session_state.empresa["nit"] = nit
+                st.session_state.empresa["trabajadores"] = trabajadores
+                st.session_state.empresa["ciudad"] = ciudad
                 st.success("✅ ¡Información guardada correctamente!")
                 if st.session_state.fase_actual == 1:
                     st.session_state.fase_actual = 2
@@ -348,11 +297,9 @@ def fase1_diagnostico():
         with col1:
             st.write(f"**🏢 Empresa:** {st.session_state.empresa.get('nombre')}")
             st.write(f"**📄 NIT:** {st.session_state.empresa.get('nit')}")
-            st.write(f"**🏭 Sector:** {st.session_state.empresa.get('sector')}")
         with col2:
             st.write(f"**👥 Trabajadores:** {st.session_state.empresa.get('trabajadores')}")
             st.write(f"**📍 Ciudad:** {st.session_state.empresa.get('ciudad')}")
-            st.write(f"**🛡️ ARL:** {st.session_state.empresa.get('arl')}")
 
 # ==================== FASE 2: PELIGROS ====================
 def fase2_peligros():
@@ -406,7 +353,6 @@ def fase3_riesgos():
     
     if st.session_state.peligros:
         for p in st.session_state.peligros:
-            riesgo_clase = f"riesgo-{p['nivel']}"
             st.markdown(f'''
             <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #667eea;">
                 <h4>📍 {p["peligro"]}</h4>
@@ -546,7 +492,22 @@ def asistente_ia():
     
     if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
-        respuesta = responder_ia(prompt)
+        prompt_lower = prompt.lower()
+        
+        if "fase" in prompt_lower or "progreso" in prompt_lower:
+            respuesta = f"**📊 Progreso:** {calcular_progreso()}% completado. Estás en la Fase {st.session_state.fase_actual} de 6."
+        elif "empresa" in prompt_lower:
+            if st.session_state.empresa.get("nombre"):
+                respuesta = f"**🏢 Empresa:** {st.session_state.empresa.get('nombre')} - {st.session_state.empresa.get('trabajadores')} trabajadores"
+            else:
+                respuesta = "⚠️ Aún no has registrado la empresa en la Fase 1"
+        elif "peligro" in prompt_lower:
+            respuesta = f"**⚠️ Peligros:** {len(st.session_state.peligros)} identificados"
+        elif "capacitacion" in prompt_lower:
+            respuesta = f"**📚 Capacitaciones:** {len(st.session_state.capacitaciones)} programadas"
+        else:
+            respuesta = f"**🤖 Asistente:** Fase {st.session_state.fase_actual} - {calcular_progreso()}% completado. ¿Necesitas ayuda con alguna fase específica?"
+        
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
 
