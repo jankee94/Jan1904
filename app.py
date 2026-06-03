@@ -8,6 +8,7 @@ from firebase_admin import credentials, firestore
 import json
 import os
 import requests
+import time
 
 st.set_page_config(
     page_title="SG-SST PHVA - Gestión SST",
@@ -65,40 +66,6 @@ if len(st.session_state.plan_accion) == 0:
         {"accion": "Capacitación en trabajo seguro en alturas", "responsable": "Proveedor externo", "fecha": "2024-04-20", "estado": "Pendiente"}
     ]
 
-# ==================== FIREBASE ====================
-def init_firebase():
-    if not firebase_admin._apps:
-        try:
-            if os.path.exists("firebase-credentials.json"):
-                cred = credentials.Certificate("firebase-credentials.json")
-                firebase_admin.initialize_app(cred)
-                return True
-            elif hasattr(st, "secrets") and "firebase" in st.secrets:
-                firebase_config = {
-                    "type": st.secrets["firebase"]["type"],
-                    "project_id": st.secrets["firebase"]["project_id"],
-                    "private_key_id": st.secrets["firebase"]["private_key_id"],
-                    "private_key": st.secrets["firebase"]["private_key"].replace('\\n', '\n'),
-                    "client_email": st.secrets["firebase"]["client_email"],
-                    "client_id": st.secrets["firebase"]["client_id"],
-                    "auth_uri": st.secrets["firebase"]["auth_uri"],
-                    "token_uri": st.secrets["firebase"]["token_uri"]
-                }
-                cred = credentials.Certificate(firebase_config)
-                firebase_admin.initialize_app(cred)
-                return True
-            return False
-        except:
-            return False
-    return True
-
-try:
-    FIREBASE_CONECTADO = init_firebase()
-    if FIREBASE_CONECTADO:
-        db = firestore.client()
-except:
-    FIREBASE_CONECTADO = False
-
 # ==================== FUNCIONES ====================
 def calcular_nivel_riesgo(p, s):
     puntaje = p * s
@@ -117,199 +84,220 @@ def calcular_progreso():
     if len(st.session_state.incidentes) > 0: completadas += 1
     return int((completadas / 6) * 100)
 
-# ==================== IA REAL CON GEMINI ====================
+# ==================== IA REAL CON GEMINI + GROQ ====================
+def obtener_contexto_proyecto():
+    """Construye el contexto completo del proyecto para la IA"""
+    peligros_texto = ""
+    for i, p in enumerate(st.session_state.peligros[:10]):
+        peligros_texto += f"{i+1}. {p['peligro']} - Nivel {p['nivel']} - Controles: {p.get('controles', 'No especificados')[:100]}\n"
+    
+    plan_texto = ""
+    for i, a in enumerate(st.session_state.plan_accion[:5]):
+        plan_texto += f"{i+1}. {a['accion'][:100]} - Responsable: {a['responsable']} - Estado: {a['estado']}\n"
+    
+    return f"""
+INFORMACIÓN DEL PROYECTO SG-SST PHVA:
+
+EMPRESA:
+- Nombre: {st.session_state.empresa.get('nombre', 'No registrada')}
+- NIT: {st.session_state.empresa.get('nit', 'No registrado')}
+- Sector: {st.session_state.empresa.get('sector', 'No especificado')}
+- Ciudad: {st.session_state.empresa.get('ciudad', 'No registrada')}
+- ARL: {st.session_state.empresa.get('arl', 'No registrada')}
+- Número de trabajadores: {st.session_state.empresa.get('trabajadores', 0)}
+
+PROGRESO DEL PROYECTO:
+- Fase actual: {st.session_state.fase_actual}/6
+- Progreso total: {calcular_progreso()}%
+- Fase 1 Diagnóstico: {'Completada' if st.session_state.empresa.get('nombre') else 'Pendiente'}
+- Fase 2 Peligros: {len(st.session_state.peligros)} peligros identificados
+- Fase 3 Riesgos: {len(st.session_state.matriz_riesgos)} riesgos evaluados
+- Fase 4 Plan de Acción: {len(st.session_state.plan_accion)} acciones definidas
+- Fase 5 Implementación: {len(st.session_state.capacitaciones)} capacitaciones programadas
+- Fase 6 Seguimiento: {len(st.session_state.incidentes)} incidentes reportados
+
+PELIGROS IDENTIFICADOS:
+{peligros_texto if peligros_texto else 'No hay peligros registrados'}
+
+PLAN DE ACCIÓN:
+{plan_texto if plan_texto else 'No hay acciones planificadas'}
+
+ESTADÍSTICAS:
+- Peligros Nivel I (Extremo): {sum(1 for p in st.session_state.peligros if p.get('nivel') == 'I')}
+- Peligros Nivel II (Alto): {sum(1 for p in st.session_state.peligros if p.get('nivel') == 'II')}
+- Acciones pendientes: {sum(1 for a in st.session_state.plan_accion if a.get('estado') == 'Pendiente')}
+- Capacitaciones: {len(st.session_state.capacitaciones)}
+- Incidentes: {len(st.session_state.incidentes)}
+"""
+
 def llamar_gemini(prompt, contexto):
-    """Llamar a la API de Gemini con el contexto del proyecto"""
+    """Llama a la API de Gemini"""
     try:
-        # Obtener API key de secrets
-        if hasattr(st, "secrets") and "gemini" in st.secrets:
-            api_key = st.secrets["gemini"]["api_key"]
-        else:
-            # Demo - respuestas simuladas
-            return None
-        
-        # Construir prompt con contexto
-        contexto_completo = f"""
-        Eres un asistente experto en Seguridad y Salud en el Trabajo (SST).
-        
-        Contexto actual del proyecto:
-        - Fase actual: {st.session_state.fase_actual}
-        - Progreso: {calcular_progreso()}%
-        - Empresa: {st.session_state.empresa.get('nombre', 'No registrada')}
-        - Sector: {st.session_state.empresa.get('sector', 'No especificado')}
-        - Peligros identificados: {len(st.session_state.peligros)}
-        - Acciones planificadas: {len(st.session_state.plan_accion)}
-        
-        Responde de manera clara, concisa y profesional a la siguiente consulta:
-        {prompt}
-        """
-        
-        # Llamar a Gemini API
+        api_key = st.secrets["gemini"]["api_key"]
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         
         payload = {
             "contents": [{
-                "parts": [{"text": contexto_completo}]
+                "parts": [{"text": f"""
+Eres un asistente experto en Seguridad y Salud en el Trabajo (SST). 
+Tienes acceso a los siguientes datos del proyecto:
+
+{contexto}
+
+El usuario pregunta: {prompt}
+
+Responde de manera profesional, clara y útil usando los datos del proyecto cuando sea relevante. Si el usuario pide analizar o revisar algo, usa los datos proporcionados.
+"""}]
             }]
         }
         
-        response = requests.post(url, json=payload)
-        
+        response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
             data = response.json()
-            respuesta = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "No pude procesar tu consulta.")
-            return respuesta
-        else:
-            return None
-            
+            return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", None)
+        return None
     except Exception as e:
         return None
 
-def respuesta_ia_inteligente(prompt):
-    """Generar respuesta inteligente usando Gemini o respuestas contextuales"""
+def llamar_groq(prompt, contexto):
+    """Llama a la API de Groq"""
+    try:
+        api_key = st.secrets["groq"]["api_key"]
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "llama3-70b-8192",
+            "messages": [
+                {"role": "system", "content": f"Eres un experto en SST. Datos del proyecto: {contexto}"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 500
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", None)
+        return None
+    except Exception as e:
+        return None
+
+def responder_con_ia(prompt):
+    """Intenta responder con Gemini, si falla usa Groq, si no respuestas inteligentes"""
     
-    # Intentar usar Gemini primero
-    respuesta_gemini = llamar_gemini(prompt, "")
-    if respuesta_gemini:
-        return respuesta_gemini
+    # Obtener contexto del proyecto
+    contexto = obtener_contexto_proyecto()
     
-    # Si Gemini falla, usar respuestas contextuales mejoradas
-    prompt_lower = prompt.lower()
-    
-    # Contexto del proyecto
-    contexto = f"""
-    **📊 Estado actual del proyecto:**
-    - Fase: {st.session_state.fase_actual}/6
-    - Progreso: {calcular_progreso()}% completado
-    - Empresa: {st.session_state.empresa.get('nombre', 'No registrada')}
-    - Sector: {st.session_state.empresa.get('sector', 'No especificado')}
-    - Peligros: {len(st.session_state.peligros)} identificados
-    """
-    
-    # Respuestas por fase
-    if any(word in prompt_lower for word in ["fase", "progreso", "avance", "estado"]):
-        return f"""{contexto}
+    # Mostrar indicador de que la IA está pensando
+    with st.spinner("🧠 IA analizando tu consulta..."):
+        # Intentar con Gemini primero
+        respuesta = llamar_gemini(prompt, contexto)
+        
+        # Si Gemini falla, intentar con Groq
+        if not respuesta:
+            respuesta = llamar_groq(prompt, contexto)
+        
+        # Si ambos fallan, usar respuesta inteligente local
+        if not respuesta:
+            prompt_lower = prompt.lower()
+            
+            if "empresa" in prompt_lower or "diagnostico" in prompt_lower:
+                respuesta = f"""**🏢 INFORMACIÓN DE LA EMPRESA**
 
-**🎯 Recomendación para la Fase {st.session_state.fase_actual}:**
-{['Completa el registro de la empresa', 'Identifica peligros por proceso', 'Evalúa riesgos GTC-45', 'Define acciones correctivas', 'Programa capacitaciones', 'Monitorea indicadores'][st.session_state.fase_actual-1]}"""
-    
-    elif any(word in prompt_lower for word in ["peligro", "riesgo", "gtc", "identificar", "matriz"]):
-        peligros_lista = "\n".join([f"   - {p['peligro']} (Nivel {p['nivel']})" for p in st.session_state.peligros[:5]])
-        return f"""**⚠️ Análisis de Peligros - GTC-45**
+{contexto.split('EMPRESA:')[1].split('PROGRESO')[0]}
 
-**Peligros identificados en tu empresa:**
-{peligros_lista if peligros_lista else '   - No hay peligros registrados aún'}
+**¿Necesitas modificar algún dato de la empresa? Ve a la Fase 1: Diagnóstico**"""
+            
+            elif "peligro" in prompt_lower or "riesgo" in prompt_lower:
+                respuesta = f"""**⚠️ ANÁLISIS DE PELIGROS**
 
-**Metodología recomendada:**
-1. Identificar actividades críticas
-2. Evaluar probabilidad (1-4) y severidad (1-3)
-3. Calcular nivel de riesgo (I, II, III, IV)
-4. Priorizar controles para niveles I y II
+{contexto.split('PELIGROS IDENTIFICADOS:')[1].split('PLAN DE ACCIÓN')[0]}
 
-**¿Necesitas identificar un peligro específico?**"""
-    
-    elif any(word in prompt_lower for word in ["capacitacion", "curso", "entrenamiento", "formacion"]):
-        return f"""**📚 Plan de Capacitaciones Personalizado**
+**Recomendación:** Prioriza los peligros Nivel I y II para intervención inmediata."""
+            
+            elif "progreso" in prompt_lower or "fase" in prompt_lower or "avance" in prompt_lower:
+                respuesta = f"""**📊 ESTADO DEL PROYECTO**
 
-**Basado en tu sector ({st.session_state.empresa.get('sector', 'General')}):**
+{contexto.split('PROGRESO DEL PROYECTO:')[1].split('PELIGROS IDENTIFICADOS')[0]}
 
-**Capacitaciones prioritarias:**
-1. Sistema de Gestión SST (8 horas) - Obligatoria
-2. Prevención de riesgos laborales (8 horas) - Obligatoria
-3. Manejo de emergencias (4 horas) - Recomendada
-4. Primeros auxilios (8 horas) - Recomendada
+**Próxima acción:** Completa la Fase {st.session_state.fase_actual} para continuar avanzando."""
+            
+            elif "capacitacion" in prompt_lower:
+                respuesta = f"""**📚 PLAN DE CAPACITACIONES**
 
-**Próximas fechas sugeridas:**
-- Programar antes de: {(datetime.now() + timedelta(days=30)).strftime('%d/%m/%Y')}
+Basado en tu sector ({st.session_state.empresa.get('sector', 'General')}):
 
-**¿Deseas programar alguna capacitación ahora?**"""
-    
-    elif any(word in prompt_lower for word in ["incidente", "accidente", "reporte", "investigacion"]):
-        return f"""**📋 Reporte de Incidentes**
+**Capacitaciones obligatorias anuales:**
+1. Sistema de Gestión SST - 8 horas
+2. Prevención de riesgos laborales - 8 horas
+3. Manejo de extintores - 4 horas
+4. Primeros auxilios - 8 horas
+5. Trabajo en alturas - 40 horas (si aplica)
 
-**Tu empresa tiene:** {len(st.session_state.incidentes)} incidentes reportados
+**Capacitaciones programadas actualmente:** {len(st.session_state.capacitaciones)}
 
-**Formato recomendado para reportar:**
-- 📌 Tipo de incidente
-- 📅 Fecha y hora
-- 📝 Descripción detallada
-- 🔍 Causas identificadas
-- ✅ Acciones tomadas
+**¿Deseas programar una nueva capacitación? Ve a la Fase 5: Implementación**"""
+            
+            elif "incidente" in prompt_lower or "accidente" in prompt_lower:
+                respuesta = f"""**📋 REPORTE DE INCIDENTES**
+
+**Incidentes reportados:** {len(st.session_state.incidentes)}
+
+**Información requerida para reportar:**
+- Tipo de incidente
+- Fecha y hora
+- Descripción detallada
+- Causas identificadas
+- Acciones tomadas
 
 **Plazo máximo:** 24 horas hábiles
 
-**¿Deseas reportar un incidente ahora?**"""
-    
-    elif any(word in prompt_lower for word in ["norma", "ley", "decreto", "legal", "requisito"]):
-        return """**📜 Normativa SST Aplicable**
+**¿Deseas reportar un incidente? Ve a la Fase 6: Seguimiento**"""
+            
+            elif "norma" in prompt_lower or "ley" in prompt_lower:
+                respuesta = """**📜 NORMATIVA SST APLICABLE**
 
-**Principales disposiciones legales vigentes:**
+**Principales disposiciones:**
 - **Ley 1562 de 2012:** Sistema General de Riesgos Laborales
-- **Decreto 1072 de 2015:** Único Reglamentario del Sector Trabajo
+- **Decreto 1072 de 2015:** Único Reglamentario Sector Trabajo
 - **Resolución 0312 de 2019:** Estándares mínimos SST
 - **GTC-45:** Guía para identificación de peligros
 
-**Obligaciones del empleador:**
-✅ Matriz de riesgos actualizada
-✅ Comité Paritario de SST
-✅ Capacitaciones periódicas
-✅ Reporte de accidentes (FURAT)
-
 **¿Necesitas información específica sobre alguna norma?**"""
-    
-    elif any(word in prompt_lower for word in ["trabajador", "empleado", "personal", "contratar"]):
-        return f"""**👥 Gestión de Trabajadores**
+            
+            else:
+                respuesta = f"""**🤖 ASISTENTE IA - SG-SST PHVA**
 
-**Estadísticas actuales:**
-- Total trabajadores: {st.session_state.empresa.get('trabajadores', 0)}
+**Contexto actual del proyecto:**
+- Empresa: {st.session_state.empresa.get('nombre', 'No registrada')}
+- Sector: {st.session_state.empresa.get('sector', 'No especificado')}
 - Fase actual: {st.session_state.fase_actual}/6
+- Progreso: {calcular_progreso()}%
+- Peligros identificados: {len(st.session_state.peligros)}
+- Acciones planificadas: {len(st.session_state.plan_accion)}
 
-**Datos requeridos por trabajador:**
-- Documento de identidad
-- Exámenes médicos ocupacionales
-- Capacitaciones recibidas
-- Dotación y EPP asignado
-- Afiliación a EPS/ARL
+**¿Qué necesitas saber?**
+- 📊 "progreso del proyecto" - Estado actual
+- ⚠️ "peligros identificados" - Lista de riesgos
+- 🏢 "información de la empresa" - Datos corporativos
+- 📚 "capacitaciones obligatorias" - Plan anual
+- 📋 "reportar incidente" - Protocolo
 
-**¿Deseas registrar un nuevo trabajador? Ve al módulo Trabajadores**"""
+**Escribe tu consulta específica y con gusto te ayudo.**"""
     
-    elif any(word in prompt_lower for word in ["analisa", "analizar", "revisar", "codigo", "sistema"]):
-        return f"""**🔍 Análisis del Sistema SG-SST PHVA**
+    return respuesta
 
-**Estado actual del proyecto:**
-✅ **Fase 1: Diagnóstico** - Completado
-{'✅' if len(st.session_state.peligros) > 0 else '🟡'} **Fase 2: Peligros** - {len(st.session_state.peligros)} identificados
-{'✅' if len(st.session_state.matriz_riesgos) > 0 else '🟡'} **Fase 3: Riesgos** - {len(st.session_state.matriz_riesgos)} evaluados
-{'✅' if len(st.session_state.plan_accion) > 0 else '🟡'} **Fase 4: Plan** - {len(st.session_state.plan_accion)} acciones
-{'✅' if len(st.session_state.capacitaciones) > 0 else '🟡'} **Fase 5: Implementación** - {len(st.session_state.capacitaciones)} capacitaciones
-{'✅' if len(st.session_state.incidentes) > 0 else '🟡'} **Fase 6: Seguimiento** - {len(st.session_state.incidentes)} incidentes
-
-**Progreso general:** {calcular_progreso()}%
-
-**Recomendación:** {'Completa la Fase ' + str(st.session_state.fase_actual) + ' para continuar avanzando.' if calcular_progreso() < 100 else '¡Felicidades! Proyecto completado.'}"""
-    
-    else:
-        return f"""{contexto}
-
-**🤖 Asistente SST - Consulta recibida:**
-"{prompt}"
-
-**¿Te ayudo con alguno de estos temas específicos?**
-- 📊 **Estado del proyecto** - Ver progreso y fases
-- ⚠️ **Peligros GTC-45** - Identificación y evaluación
-- 👥 **Trabajadores** - Gestión de personal
-- 📚 **Capacitaciones** - Planificación obligatoria
-- 📋 **Incidentes** - Reporte e investigación
-- 📜 **Normativa** - Requisitos legales SST
-
-**Escribe el tema que te interesa (ej: 'estado del proyecto' o 'peligros')**"""
-
-# ==================== CSS COMPLETO (MANTENER EL EXISTENTE) ====================
+# ==================== CSS COMPLETO ====================
 st.markdown("""
 <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideIn { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
     @keyframes glow { 0% { box-shadow: 0 0 5px rgba(102,126,234,0.5); } 100% { box-shadow: 0 0 20px rgba(102,126,234,0.8); } }
     
     .stApp { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364) !important; }
@@ -456,457 +444,131 @@ def login_screen():
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=100)
         st.markdown("<h1>🔄 SG-SST PHVA</h1>", unsafe_allow_html=True)
         st.markdown("<h3>Ciclo PHVA - 6 Fases Completas</h3>", unsafe_allow_html=True)
-        st.markdown("<p>Sistema de Gestión de Seguridad y Salud en el Trabajo</p>", unsafe_allow_html=True)
         
         with st.form("login_form"):
             username = st.text_input("👤 Usuario")
             password = st.text_input("🔒 Contraseña", type="password")
-            if st.form_submit_button("🚀 Ingresar al Sistema", use_container_width=True):
+            if st.form_submit_button("🚀 Ingresar", use_container_width=True):
                 if username.lower() == "admin" and password.lower() == "sst2024":
                     st.session_state.authenticated = True
                     st.session_state.username = username
                     st.rerun()
                 else:
-                    st.error("❌ Credenciales incorrectas")
-                    st.info("📝 Use: **admin** / **sst2024**")
+                    st.error("❌ Use: admin / sst2024")
         
         if FIREBASE_CONECTADO:
-            st.success("☁️ Conectado a Firebase Cloud")
-        else:
-            st.info("📡 Modo Local - Datos guardados localmente")
-        
+            st.success("☁️ Conectado a Firebase")
         st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown("---")
-        st.caption("👨‍💻 Desarrolladores: Ing. Jan Benitez & Ing. Neiris Pallares")
+        st.caption("👨‍💻 Ing. Jan Benitez & Ing. Neiris Pallares")
 
 def dashboard():
-    st.markdown('''
-    <div class="main-header">
-        <h1>📊 Dashboard SG-SST PHVA</h1>
-        <p>Planificar → Hacer → Verificar → Actuar</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
+    st.markdown('<div class="main-header"><h1>📊 Dashboard SG-SST PHVA</h1><p>Planificar → Hacer → Verificar → Actuar</p></div>', unsafe_allow_html=True)
     mostrar_fases()
     st.markdown("---")
     
     col1, col2, col3, col4, col5, col6 = st.columns(6)
-    
-    with col1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>🔍</h2>", unsafe_allow_html=True)
-        st.metric("Fase 1", "✅" if st.session_state.empresa.get("nombre") else "⏳", "Diagnóstico")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>⚠️</h2>", unsafe_allow_html=True)
-        st.metric("Fase 2", f"{len(st.session_state.peligros)}", "Peligros")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📊</h2>", unsafe_allow_html=True)
-        st.metric("Fase 3", f"{len(st.session_state.matriz_riesgos)}", "Riesgos")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📋</h2>", unsafe_allow_html=True)
-        st.metric("Fase 4", f"{len(st.session_state.plan_accion)}", "Acciones")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>🚀</h2>", unsafe_allow_html=True)
-        st.metric("Fase 5", f"{len(st.session_state.capacitaciones)}", "Capacitaciones")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col6:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("<h2>📈</h2>", unsafe_allow_html=True)
-        st.metric("Fase 6", f"{len(st.session_state.incidentes)}", "Incidentes")
-        st.markdown('</div>', unsafe_allow_html=True)
+    with col1: st.metric("🔍 Fase 1", "✅" if st.session_state.empresa.get("nombre") else "⏳")
+    with col2: st.metric("⚠️ Fase 2", f"{len(st.session_state.peligros)}")
+    with col3: st.metric("📊 Fase 3", f"{len(st.session_state.matriz_riesgos)}")
+    with col4: st.metric("📋 Fase 4", f"{len(st.session_state.plan_accion)}")
+    with col5: st.metric("🚀 Fase 5", f"{len(st.session_state.capacitaciones)}")
+    with col6: st.metric("📈 Fase 6", f"{len(st.session_state.incidentes)}")
     
     st.markdown("---")
-    
-    fig = go.Figure(data=[go.Bar(
-        x=['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4', 'Fase 5', 'Fase 6'],
-        y=[
-            100 if st.session_state.empresa.get("nombre") else 0,
-            min(100, len(st.session_state.peligros) * 33),
-            min(100, len(st.session_state.matriz_riesgos) * 33),
-            min(100, len(st.session_state.plan_accion) * 33),
-            min(100, len(st.session_state.capacitaciones) * 33),
-            min(100, len(st.session_state.incidentes) * 33)
-        ],
-        marker_color=['#4ECDC4', '#FFB347', '#45B7D1', '#96CEB4', '#FFEAA7', '#FF6B6B'],
-        text_auto=True
-    )])
-    fig.update_layout(
-        title="Progreso por Fase del Proyecto",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(255,255,255,0.1)',
-        font_color='white',
-        xaxis_title="Fases del Ciclo PHVA",
-        yaxis_title="Porcentaje Completado (%)",
-        height=500
-    )
+    fig = go.Figure(data=[go.Bar(x=['F1','F2','F3','F4','F5','F6'], y=[100 if st.session_state.empresa.get("nombre") else 0, min(100, len(st.session_state.peligros)*33), min(100, len(st.session_state.matriz_riesgos)*33), min(100, len(st.session_state.plan_accion)*33), min(100, len(st.session_state.capacitaciones)*33), min(100, len(st.session_state.incidentes)*33)], marker_color=['#4ECDC4','#FFB347','#45B7D1','#96CEB4','#FFEAA7','#FF6B6B'])])
+    fig.update_layout(title="Progreso por Fase", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.1)', font_color='white')
     st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    fases_recomendaciones = [
-        "🎯 Comienza registrando la información de tu empresa en la Fase 1",
-        "⚠️ Identifica los peligros por proceso según metodología GTC-45",
-        "📊 Evalúa probabilidad (1-4) y severidad (1-3) de cada peligro",
-        "📋 Define acciones correctivas con responsables y fechas límite",
-        "🚀 Programa capacitaciones y ejecuta el plan de acción",
-        "📈 Monitorea indicadores y reporta incidentes oportunamente"
-    ]
-    st.info(f"**🎯 Próxima acción recomendada:** {fases_recomendaciones[st.session_state.fase_actual-1]}")
 
-# ==================== FASES COMPLETAS ====================
-
+# ==================== FASES ====================
 def fase1_diagnostico():
-    st.markdown('''
-    <div class="main-header">
-        <h1>🔍 Fase 1: Diagnóstico Inicial</h1>
-        <p>Registra la información básica de tu empresa</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
+    st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico Inicial</h1><p>Registra la información de tu empresa</p></div>', unsafe_allow_html=True)
     with st.form("fase1_form"):
         col1, col2 = st.columns(2)
         with col1:
-            nombre = st.text_input("🏢 Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
-            nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
-            sector = st.selectbox("🏭 Sector económico", 
-                                 ["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"],
-                                 index=["Construcción", "Manufactura", "Servicios", "Minería", "Salud", "Educación", "Comercio"].index(st.session_state.empresa.get("sector", "Construcción")))
+            nombre = st.text_input("Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
+            nit = st.text_input("NIT", value=st.session_state.empresa.get("nit", ""))
         with col2:
-            trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=st.session_state.empresa.get("trabajadores", 45))
-            ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
-            arl = st.selectbox("🛡️ ARL", ["Positiva", "Sura", "Colpatria", "Bolívar"],
-                              index=["Positiva", "Sura", "Colpatria", "Bolívar"].index(st.session_state.empresa.get("arl", "Positiva")))
-        
-        if st.form_submit_button("💾 Guardar Diagnóstico", use_container_width=True):
-            st.session_state.empresa = {
-                "nombre": nombre,
-                "nit": nit,
-                "sector": sector,
-                "trabajadores": trabajadores,
-                "ciudad": ciudad,
-                "arl": arl
-            }
-            st.success("✅ ¡Fase 1 completada! Información guardada correctamente.")
-            st.balloons()
+            trabajadores = st.number_input("Número de trabajadores", value=st.session_state.empresa.get("trabajadores", 45))
+            ciudad = st.text_input("Ciudad", value=st.session_state.empresa.get("ciudad", ""))
+        if st.form_submit_button("Guardar"):
+            st.session_state.empresa["nombre"] = nombre
+            st.session_state.empresa["nit"] = nit
+            st.session_state.empresa["trabajadores"] = trabajadores
+            st.session_state.empresa["ciudad"] = ciudad
+            st.success("✅ Información guardada")
             st.session_state.fase_actual = 2
             st.rerun()
-    
-    if st.session_state.empresa.get("nombre"):
-        st.markdown("---")
-        st.subheader("📋 Información actual de la empresa")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"**🏢 Empresa:** {st.session_state.empresa.get('nombre')}")
-            st.write(f"**📄 NIT:** {st.session_state.empresa.get('nit')}")
-            st.write(f"**🏭 Sector:** {st.session_state.empresa.get('sector')}")
-        with col2:
-            st.write(f"**👥 Trabajadores:** {st.session_state.empresa.get('trabajadores')}")
-            st.write(f"**📍 Ciudad:** {st.session_state.empresa.get('ciudad')}")
-            st.write(f"**🛡️ ARL:** {st.session_state.empresa.get('arl')}")
 
 def fase2_peligros():
-    st.markdown('''
-    <div class="main-header">
-        <h1>⚠️ Fase 2: Identificación de Peligros</h1>
-        <p>Metodología GTC-45 - Identifica y clasifica los peligros</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["📋 Lista de Peligros Identificados", "➕ Identificar Nuevo Peligro"])
-    
-    with tab1:
-        if st.session_state.peligros:
-            df = pd.DataFrame(st.session_state.peligros)
-            st.dataframe(df, use_container_width=True)
-            
-            st.subheader("📊 Resumen por Nivel de Riesgo")
-            col1, col2, col3, col4 = st.columns(4)
-            niveles = pd.DataFrame(st.session_state.peligros)['nivel'].value_counts()
-            col1.metric("🔴 Nivel I", niveles.get("I", 0), "Riesgo Extremo")
-            col2.metric("🟠 Nivel II", niveles.get("II", 0), "Riesgo Alto")
-            col3.metric("🟡 Nivel III", niveles.get("III", 0), "Riesgo Medio")
-            col4.metric("🟢 Nivel IV", niveles.get("IV", 0), "Riesgo Bajo")
-            
-            st.markdown("---")
-            if st.button("✅ Avanzar a Fase 3 - Evaluación de Riesgos", use_container_width=True):
-                st.session_state.fase_actual = 3
-                st.rerun()
-        else:
-            st.info("📌 No hay peligros identificados. Usa el formulario para comenzar.")
-    
-    with tab2:
-        with st.form("nuevo_peligro"):
-            col1, col2 = st.columns(2)
-            with col1:
-                proceso = st.selectbox("📌 Proceso/Área", ["Administrativo", "Operativo", "Mantenimiento", "Logística", "Oficinas", "Campo"])
-                peligro = st.text_area("📝 Descripción del peligro", height=80)
-                tipo = st.selectbox("🏷️ Tipo de Peligro", 
-                                   ["Biológico", "Físico (Ruido)", "Físico (Iluminación)", "Físico (Temperatura)",
-                                    "Químico", "Psicosocial", "Ergonómico", "Mecánico", "Eléctrico", "Locativo"])
-            with col2:
-                st.markdown("#### 📊 Evaluación GTC-45")
-                probabilidad = st.select_slider("Probabilidad", options=[1,2,3,4],
-                                               format_func=lambda x: {1:"Baja",2:"Media",3:"Alta",4:"Muy Alta"}[x])
-                severidad = st.select_slider("Severidad", options=[1,2,3],
-                                            format_func=lambda x: {1:"Leve",2:"Grave",3:"Mortal"}[x])
-                nivel = calcular_nivel_riesgo(probabilidad, severidad)
-                
-                niveles_texto = {
-                    "I": "🔴 Nivel I - Riesgo Extremo - Intervención inmediata",
-                    "II": "🟠 Nivel II - Riesgo Alto - Corregir ASAP",
-                    "III": "🟡 Nivel III - Riesgo Medio - Mejorar",
-                    "IV": "🟢 Nivel IV - Riesgo Bajo - Mantener"
-                }
-                st.info(f"**Nivel de Riesgo calculado:** {niveles_texto[nivel]}")
-            
-            controles = st.text_area("🛡️ Controles existentes", height=80)
-            responsable = st.text_input("👤 Responsable del control")
-            
-            if st.form_submit_button("✅ Identificar Peligro", use_container_width=True):
-                if peligro:
-                    nuevo = {
-                        "id": len(st.session_state.peligros)+1,
-                        "proceso": proceso,
-                        "peligro": peligro,
-                        "tipo": tipo,
-                        "probabilidad": probabilidad,
-                        "severidad": severidad,
-                        "nivel": nivel,
-                        "controles": controles,
-                        "responsable": responsable,
-                        "fecha": datetime.now().strftime("%Y-%m-%d")
-                    }
-                    st.session_state.peligros.append(nuevo)
-                    st.success(f"✅ Peligro nivel {nivel} identificado correctamente")
-                    st.rerun()
-                else:
-                    st.error("❌ Complete la descripción del peligro")
+    st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros</h1><p>Metodología GTC-45</p></div>', unsafe_allow_html=True)
+    with st.form("nuevo_peligro"):
+        peligro = st.text_input("Descripción del peligro")
+        probabilidad = st.slider("Probabilidad (1-4)", 1, 4, 3)
+        severidad = st.slider("Severidad (1-3)", 1, 3, 2)
+        if st.form_submit_button("Identificar"):
+            nivel = calcular_nivel_riesgo(probabilidad, severidad)
+            st.session_state.peligros.append({"peligro": peligro, "probabilidad": probabilidad, "severidad": severidad, "nivel": nivel})
+            st.success(f"✅ Peligro nivel {nivel} identificado")
+            st.rerun()
+    if st.session_state.peligros:
+        st.dataframe(pd.DataFrame(st.session_state.peligros))
+        if st.button("✅ Avanzar a Fase 3"):
+            st.session_state.fase_actual = 3
+            st.rerun()
 
 def fase3_riesgos():
-    st.markdown('''
-    <div class="main-header">
-        <h1>📊 Fase 3: Evaluación de Riesgos</h1>
-        <p>Análisis detallado de probabilidad y severidad</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
+    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación de Riesgos</h1></div>', unsafe_allow_html=True)
     if st.session_state.peligros:
-        st.subheader("📋 Matriz de Riesgos Evaluados")
         for p in st.session_state.peligros:
-            riesgo_clase = f"riesgo-{p['nivel']}"
-            st.markdown(f'''
-            <div class="step-card {riesgo_clase}">
-                <h4>📍 {p['peligro']}</h4>
-                <p><strong>Proceso:</strong> {p['proceso']} | <strong>Tipo:</strong> {p.get('tipo', 'No especificado')}</p>
-                <p><strong>Evaluación:</strong> Probabilidad {p['probabilidad']}/4 × Severidad {p['severidad']}/3 = <strong>Nivel {p['nivel']}</strong></p>
-                <p><strong>Controles actuales:</strong> {p['controles']}</p>
-                <small>Responsable: {p.get('responsable', 'No asignado')}</small>
-            </div>
-            ''', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        if st.button("✅ Completar Evaluación de Riesgos", use_container_width=True):
+            st.write(f"**{p['peligro']}** - Nivel {p['nivel']}")
+        if st.button("✅ Completar Evaluación"):
             st.session_state.matriz_riesgos = st.session_state.peligros.copy()
             st.session_state.fase_actual = 4
-            st.success("¡Fase 3 completada! Ahora define el plan de acción.")
             st.rerun()
-    else:
-        st.warning("⚠️ Primero identifica peligros en la Fase 2")
 
 def fase4_plan_accion():
-    st.markdown('''
-    <div class="main-header">
-        <h1>📋 Fase 4: Plan de Acción</h1>
-        <p>Define acciones correctivas con responsables y fechas</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["📋 Plan de Acción Actual", "➕ Nueva Acción Correctiva"])
-    
-    with tab1:
-        if st.session_state.plan_accion:
-            df = pd.DataFrame(st.session_state.plan_accion)
-            st.dataframe(df, use_container_width=True)
-            
-            st.markdown("---")
-            if st.button("✅ Completar Plan de Acción", use_container_width=True):
-                st.session_state.fase_actual = 5
-                st.success("¡Fase 4 completada! Ahora implementa las acciones.")
-                st.rerun()
-        else:
-            st.info("📌 No hay acciones en el plan")
-    
-    with tab2:
-        with st.form("nueva_accion"):
-            accion = st.text_area("📝 Acción correctiva", height=80)
-            responsable = st.text_input("👤 Responsable")
-            fecha = st.date_input("📅 Fecha límite", datetime.now() + timedelta(days=30))
-            estado = st.selectbox("📊 Estado", ["Pendiente", "En progreso", "Completada"])
-            
-            if st.form_submit_button("➕ Agregar Acción al Plan", use_container_width=True):
-                if accion:
-                    st.session_state.plan_accion.append({
-                        "accion": accion,
-                        "responsable": responsable,
-                        "fecha": str(fecha),
-                        "estado": estado
-                    })
-                    st.success("✅ Acción agregada al plan correctamente")
-                    st.rerun()
-                else:
-                    st.error("❌ Complete la descripción de la acción")
+    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción</h1></div>', unsafe_allow_html=True)
+    with st.form("nueva_accion"):
+        accion = st.text_area("Acción")
+        responsable = st.text_input("Responsable")
+        if st.form_submit_button("Agregar"):
+            st.session_state.plan_accion.append({"accion": accion, "responsable": responsable, "estado": "Pendiente"})
+            st.rerun()
+    if st.session_state.plan_accion:
+        st.dataframe(pd.DataFrame(st.session_state.plan_accion))
+        if st.button("✅ Completar Plan"):
+            st.session_state.fase_actual = 5
+            st.rerun()
 
 def fase5_implementacion():
-    st.markdown('''
-    <div class="main-header">
-        <h1>🚀 Fase 5: Implementación</h1>
-        <p>Ejecuta el plan de acción y programa capacitaciones</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📚 Capacitaciones Programadas")
-        with st.form("nueva_capacitacion"):
-            tema = st.text_input("Tema de capacitación")
-            fecha = st.date_input("Fecha programada", datetime.now() + timedelta(days=7))
-            if st.form_submit_button("📅 Programar Capacitación", use_container_width=True):
-                if tema:
-                    st.session_state.capacitaciones.append({
-                        "tema": tema,
-                        "fecha": str(fecha),
-                        "estado": "Programada",
-                        "fecha_registro": datetime.now().strftime("%Y-%m-%d")
-                    })
-                    st.success("✅ Capacitación programada exitosamente")
-                    st.rerun()
-        
-        if st.session_state.capacitaciones:
-            st.markdown("---")
-            for c in st.session_state.capacitaciones:
-                st.info(f"📅 **{c['tema']}** - {c['fecha']}")
-    
-    with col2:
-        st.subheader("✅ Ejecución del Plan de Acción")
-        for i, accion in enumerate(st.session_state.plan_accion):
-            if st.checkbox(f"✓ {accion['accion'][:60]}...", key=f"check_{i}"):
-                st.session_state.plan_accion[i]['estado'] = "Completada"
-                st.success(f"✅ Acción completada: {accion['accion'][:50]}")
-        
-        st.markdown("---")
-        if len(st.session_state.capacitaciones) >= 1:
-            if st.button("✅ Completar Fase de Implementación", use_container_width=True):
-                st.session_state.fase_actual = 6
-                st.success("¡Fase 5 completada! Ahora monitorea los resultados.")
-                st.rerun()
+    st.markdown('<div class="main-header"><h1>🚀 Fase 5: Implementación</h1></div>', unsafe_allow_html=True)
+    with st.form("nueva_capacitacion"):
+        tema = st.text_input("Tema de capacitación")
+        if st.form_submit_button("Programar"):
+            st.session_state.capacitaciones.append({"tema": tema, "estado": "Programada"})
+            st.rerun()
+    if len(st.session_state.capacitaciones) >= 1:
+        if st.button("✅ Completar Implementación"):
+            st.session_state.fase_actual = 6
+            st.rerun()
 
 def fase6_seguimiento():
-    st.markdown('''
-    <div class="main-header">
-        <h1>📈 Fase 6: Seguimiento y Control</h1>
-        <p>Monitorea indicadores y reporta incidentes</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Indicadores Clave de Gestión")
-        
-        total_peligros = len(st.session_state.peligros)
-        riesgos_criticos = sum(1 for p in st.session_state.peligros if p.get('nivel') in ['I', 'II'])
-        acciones_completadas = sum(1 for a in st.session_state.plan_accion if a.get('estado') == 'Completada')
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("⚠️ Peligros", total_peligros, "Identificados")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("🔴 Riesgos Críticos", riesgos_criticos, "Nivel I y II")
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col_b:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("📋 Acciones", f"{acciones_completadas}/{len(st.session_state.plan_accion)}", "Completadas")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("📚 Capacitaciones", len(st.session_state.capacitaciones), "Programadas")
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.subheader("📋 Registro de Incidentes")
-        with st.form("nuevo_incidente"):
-            tipo = st.selectbox("Tipo de incidente", ["Accidente de trabajo", "Incidente sin lesión", "Enfermedad laboral", "Acto inseguro", "Condición insegura", "Casi accidente"])
-            descripcion = st.text_area("Descripción detallada", height=100)
-            if st.form_submit_button("📋 Reportar Incidente", use_container_width=True):
-                if descripcion:
-                    st.session_state.incidentes.append({
-                        "tipo": tipo,
-                        "descripcion": descripcion,
-                        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "estado": "Registrado"
-                    })
-                    st.success("✅ Incidente reportado correctamente")
-                    st.rerun()
-        
-        if st.session_state.incidentes:
-            st.markdown("---")
-            for i in st.session_state.incidentes:
-                st.warning(f"⚠️ **{i['tipo']}** - {i['fecha']}\n\n{i['descripcion'][:100]}...")
-    
-    progreso_total = calcular_progreso()
-    if progreso_total >= 90:
+    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento</h1></div>', unsafe_allow_html=True)
+    with st.form("nuevo_incidente"):
+        descripcion = st.text_area("Descripción del incidente")
+        if st.form_submit_button("Reportar"):
+            st.session_state.incidentes.append({"descripcion": descripcion, "fecha": str(datetime.now())})
+            st.rerun()
+    if calcular_progreso() >= 90:
         st.balloons()
-        st.success("🎉 ¡FELICITACIONES! Has completado todas las fases del ciclo PHVA")
-        st.balloons()
+        st.success("🎉 PROYECTO COMPLETADO")
 
 def asistente_ia():
-    st.markdown('''
-    <div class="main-header">
-        <h1>🤖 Asistente IA - Experto en SST</h1>
-        <p>Tu asistente virtual especializado en Seguridad y Salud en el Trabajo</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    
+    st.markdown('<div class="main-header"><h1>🤖 Asistente IA</h1><p>IA con Gemini + Groq - Analiza tu proyecto en tiempo real</p></div>', unsafe_allow_html=True)
     mostrar_fases()
-    st.markdown("---")
     
     if not st.session_state.ia_messages:
-        st.session_state.ia_messages = [{
-            "role": "assistant",
-            "content": f"""**🤖 ¡Hola! Soy tu Asistente IA especializado en SST**
-
-Estamos en **Fase {st.session_state.fase_actual}** del proyecto.
-**Progreso actual:** {calcular_progreso()}% completado
-
-Puedo ayudarte con:
-
-📌 **Fase 1:** Registrar información de la empresa
-📌 **Fase 2:** Identificar peligros según GTC-45
-📌 **Fase 3:** Evaluar probabilidad y severidad
-📌 **Fase 4:** Crear plan de acción
-📌 **Fase 5:** Programar capacitaciones
-📌 **Fase 6:** Monitorear indicadores
-
-**¿En qué puedo ayudarte hoy?**"""
-        }]
+        st.session_state.ia_messages = [{"role": "assistant", "content": f"**🤖 Hola!** Soy tu IA con Gemini. Veo que estás en Fase {st.session_state.fase_actual} con {calcular_progreso()}% completado. ¿En qué te ayudo?"}]
     
     for msg in st.session_state.ia_messages:
         if msg["role"] == "user":
@@ -914,11 +576,11 @@ Puedo ayudarte con:
         else:
             st.markdown(f'<div class="ia-message-bot">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
     
-    if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
+    if prompt := st.chat_input("Escribe tu consulta (la IA usará Gemini para responder)..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
         
-        # Usar la IA inteligente con contexto del proyecto
-        respuesta = respuesta_ia_inteligente(prompt)
+        with st.spinner("🧠 IA pensando..."):
+            respuesta = responder_con_ia(prompt)
         
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
@@ -930,50 +592,16 @@ else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
         st.markdown("### 🔄 SG-SST PHVA")
-        st.markdown(f"**👤 Usuario:** {st.session_state.username}")
-        
-        if FIREBASE_CONECTADO:
-            st.success("☁️ Cloud Sync")
-        
+        st.markdown(f"**👤** {st.session_state.username}")
         st.markdown("---")
-        
         fases_nombres = {1:"🔍 Diagnóstico", 2:"⚠️ Peligros", 3:"📊 Riesgos", 4:"📋 Plan", 5:"🚀 Implementación", 6:"📈 Seguimiento"}
-        
-        st.markdown(f'''
-        <div class="fase-badge">
-            <strong>📍 FASE ACTUAL</strong><br>
-            {fases_nombres[st.session_state.fase_actual]}
-        </div>
-        ''', unsafe_allow_html=True)
-        
+        st.markdown(f'<div class="fase-badge"><strong>📍 FASE ACTUAL</strong><br>{fases_nombres[st.session_state.fase_actual]}</div>', unsafe_allow_html=True)
         st.progress(calcular_progreso() / 100)
-        st.caption(f"**{calcular_progreso()}% completado**")
-        
         st.markdown("---")
-        
-        menu = st.radio(
-            "📋 **Módulos del Sistema**",
-            [
-                "📊 Dashboard",
-                "🔍 Fase 1: Diagnóstico",
-                "⚠️ Fase 2: Peligros GTC-45",
-                "📊 Fase 3: Evaluación de Riesgos",
-                "📋 Fase 4: Plan de Acción",
-                "🚀 Fase 5: Implementación",
-                "📈 Fase 6: Seguimiento",
-                "🤖 Asistente IA"
-            ],
-            index=0
-        )
-        
+        menu = st.radio("📋 Módulos", ["📊 Dashboard", "🔍 Fase 1: Diagnóstico", "⚠️ Fase 2: Peligros", "📊 Fase 3: Riesgos", "📋 Fase 4: Plan de Acción", "🚀 Fase 5: Implementación", "📈 Fase 6: Seguimiento", "🤖 Asistente IA"])
         st.markdown("---")
-        st.caption("**👨‍💻 Desarrolladores:**")
-        st.caption("Ing. Jan Benitez")
-        st.caption("Ing. Neiris Pallares")
-        st.markdown("---")
-        st.caption("📌 **Ciclo PHVA Continuo**")
-        
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+        st.caption("👨‍💻 Ing. Jan Benitez & Ing. Neiris Pallares")
+        if st.button("🚪 Cerrar Sesión"):
             st.session_state.authenticated = False
             st.rerun()
     
@@ -981,9 +609,9 @@ else:
         dashboard()
     elif menu == "🔍 Fase 1: Diagnóstico":
         fase1_diagnostico()
-    elif menu == "⚠️ Fase 2: Peligros GTC-45":
+    elif menu == "⚠️ Fase 2: Peligros":
         fase2_peligros()
-    elif menu == "📊 Fase 3: Evaluación de Riesgos":
+    elif menu == "📊 Fase 3: Riesgos":
         fase3_riesgos()
     elif menu == "📋 Fase 4: Plan de Acción":
         fase4_plan_accion()
@@ -994,10 +622,4 @@ else:
     elif menu == "🤖 Asistente IA":
         asistente_ia()
 
-st.markdown('''
-<div class="footer">
-    <p>SG-SST PHVA - Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
-    <p>Ciclo PHVA: Planificar → Hacer → Verificar → Actuar</p>
-    <p>© 2024 - Todos los derechos reservados</p>
-</div>
-''', unsafe_allow_html=True)
+st.markdown('<div class="footer"><p>SG-SST PHVA - IA con Gemini + Groq © 2024</p></div>', unsafe_allow_html=True)
