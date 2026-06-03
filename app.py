@@ -2,7 +2,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
-import json
 
 st.set_page_config(
     page_title="SG-SST PHVA - Gestión SST",
@@ -11,15 +10,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==================== INICIALIZACIÓN CON VALORES POR DEFECTO SEGUROS ====================
+# ==================== INICIALIZACIÓN ====================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = None
 if "fase_actual" not in st.session_state:
     st.session_state.fase_actual = 1
-if "ia_messages" not in st.session_state:
-    st.session_state.ia_messages = []
 if "peligros" not in st.session_state:
     st.session_state.peligros = []
 if "capacitaciones" not in st.session_state:
@@ -27,18 +24,13 @@ if "capacitaciones" not in st.session_state:
 if "incidentes" not in st.session_state:
     st.session_state.incidentes = []
 if "empresa" not in st.session_state:
-    st.session_state.empresa = {
-        "nombre": "",
-        "nit": "",
-        "trabajadores": 1,
-        "ciudad": ""
-    }
+    st.session_state.empresa = {"nombre": "", "trabajadores": 1, "nit": "", "ciudad": ""}
 if "plan_accion" not in st.session_state:
     st.session_state.plan_accion = []
 if "matriz_riesgos" not in st.session_state:
     st.session_state.matriz_riesgos = []
-if "debug_mode" not in st.session_state:
-    st.session_state.debug_mode = False
+if "ia_messages" not in st.session_state:
+    st.session_state.ia_messages = []   # Solo para historial visual
 
 # ==================== FUNCIONES ====================
 def calcular_nivel_riesgo(p, s):
@@ -50,7 +42,7 @@ def calcular_nivel_riesgo(p, s):
 
 def calcular_progreso():
     completadas = 0
-    if st.session_state.empresa.get("nombre") and st.session_state.empresa["nombre"].strip() != "":
+    if st.session_state.empresa.get("nombre", "").strip() != "":
         completadas += 1
     if len(st.session_state.peligros) > 0:
         completadas += 1
@@ -64,58 +56,56 @@ def calcular_progreso():
         completadas += 1
     return int((completadas / 6) * 100)
 
-def respuesta_ia(pregunta):
-    """IA que lee directamente los valores actuales de session_state"""
-    empresa = st.session_state.empresa
-    nombre_emp = empresa.get("nombre", "").strip()
-    if nombre_emp == "":
+def responder_ia(pregunta):
+    """Responde leyendo los valores actuales de session_state en tiempo real"""
+    emp = st.session_state.empresa
+    nombre_emp = emp.get("nombre", "").strip()
+    if not nombre_emp:
         nombre_emp = "No registrada"
     
-    nit = empresa.get("nit", "No registrado")
-    trabajadores = empresa.get("trabajadores", 0)
-    ciudad = empresa.get("ciudad", "No registrada")
     progreso = calcular_progreso()
-    fase_act = st.session_state.fase_actual
+    fase = st.session_state.fase_actual
     total_peligros = len(st.session_state.peligros)
-    total_capacitaciones = len(st.session_state.capacitaciones)
-    total_incidentes = len(st.session_state.incidentes)
-    total_acciones = len(st.session_state.plan_accion)
+    total_cap = len(st.session_state.capacitaciones)
+    total_inc = len(st.session_state.incidentes)
+    total_acc = len(st.session_state.plan_accion)
     
     pregunta_low = pregunta.lower()
     
     if "empresa" in pregunta_low or "diagnóstico" in pregunta_low or "información" in pregunta_low:
         if nombre_emp != "No registrada":
-            return f"**🏢 INFORMACIÓN DE TU EMPRESA**\n\n- **Nombre:** {nombre_emp}\n- **NIT:** {nit}\n- **Trabajadores:** {trabajadores}\n- **Ciudad:** {ciudad}\n- **Progreso:** {progreso}%\n- **Fase actual:** {fase_act}/6\n\n¿Necesitas modificar algo? Ve a la **Fase 1**."
+            return f"**🏢 DATOS DE TU EMPRESA**\n\n- **Nombre:** {nombre_emp}\n- **NIT:** {emp.get('nit', 'No registrado')}\n- **Trabajadores:** {emp.get('trabajadores', 0)}\n- **Ciudad:** {emp.get('ciudad', 'No registrada')}\n- **Progreso:** {progreso}%\n- **Fase:** {fase}/6"
         else:
-            return "⚠️ Aún no has registrado tu empresa. Ve a la **Fase 1: Diagnóstico** y completa el formulario."
+            return "⚠️ Aún no has registrado tu empresa. Ve a **Fase 1** y completa el formulario."
     
     elif "progreso" in pregunta_low or "avance" in pregunta_low or "fase" in pregunta_low:
-        return f"**📊 PROGRESO DEL PROYECTO**\n\n- **Progreso total:** {progreso}%\n- **Fase actual:** {fase_act}/6\n\n**Detalle por fase:**\n- Fase 1 (Diagnóstico): {'✅ Completada' if nombre_emp != 'No registrada' else '⏳ Pendiente'}\n- Fase 2 (Peligros): {total_peligros} peligros\n- Fase 3 (Riesgos): {len(st.session_state.matriz_riesgos)} evaluados\n- Fase 4 (Plan): {total_acciones} acciones\n- Fase 5 (Capacitaciones): {total_capacitaciones} programadas\n- Fase 6 (Seguimiento): {total_incidentes} incidentes"
+        return f"**📊 PROGRESO ACTUAL**\n\n- **Progreso total:** {progreso}%\n- **Fase actual:** {fase}/6\n- **Detalle:**\n  - Diagnóstico: {'✅' if nombre_emp != 'No registrada' else '⏳'}\n  - Peligros: {total_peligros} identificados\n  - Riesgos: {len(st.session_state.matriz_riesgos)} evaluados\n  - Plan: {total_acc} acciones\n  - Capacitaciones: {total_cap}\n  - Incidentes: {total_inc}"
     
     elif "peligro" in pregunta_low or "gtc" in pregunta_low:
         if total_peligros > 0:
             lista = "\n".join([f"- {p['peligro']} (Nivel {p['nivel']})" for p in st.session_state.peligros[:5]])
-            return f"**⚠️ PELIGROS IDENTIFICADOS**\n\n{lista}\n\n**Total:** {total_peligros} peligros.\n\n¿Necesitas agregar uno nuevo? Ve a la **Fase 2**."
+            return f"**⚠️ PELIGROS IDENTIFICADOS**\n\n{lista}\n\n**Total:** {total_peligros}"
         else:
-            return "⚠️ No hay peligros registrados. Ve a la **Fase 2** e identifica peligros según GTC-45."
+            return "⚠️ No hay peligros registrados. Ve a **Fase 2**."
     
     elif "capacitacion" in pregunta_low:
-        if total_capacitaciones > 0:
+        if total_cap > 0:
             lista_cap = "\n".join([f"- {c['tema']} ({c['fecha']})" for c in st.session_state.capacitaciones])
-            return f"**📚 CAPACITACIONES PROGRAMADAS**\n\n{lista_cap}\n\n¿Necesitas agregar una? Ve a la **Fase 5**."
+            return f"**📚 CAPACITACIONES**\n\n{lista_cap}\n\n**Total:** {total_cap}"
         else:
-            return "📚 No hay capacitaciones programadas. Ve a la **Fase 5: Implementación**."
+            return "📚 No hay capacitaciones programadas. Ve a **Fase 5**."
     
     elif "incidente" in pregunta_low:
-        if total_incidentes > 0:
-            return f"**📋 INCIDENTES REPORTADOS:** {total_incidentes}. Revisa el módulo de Seguimiento."
+        if total_inc > 0:
+            lista_inc = "\n".join([f"- {i['tipo']}: {i['descripcion'][:50]}" for i in st.session_state.incidentes])
+            return f"**📋 INCIDENTES REPORTADOS**\n\n{lista_inc}\n\n**Total:** {total_inc}"
         else:
             return "✅ No se han reportado incidentes."
     
     else:
-        return f"**🤖 ASISTENTE IA - DATOS ACTUALES**\n\n- **Empresa:** {nombre_emp}\n- **Progreso:** {progreso}%\n- **Fase:** {fase_act}/6\n- **Peligros:** {total_peligros}\n- **Capacitaciones:** {total_capacitaciones}\n- **Incidentes:** {total_incidentes}\n\nPregúntame sobre: empresa, progreso, peligros, capacitaciones, incidentes."
+        return f"**🤖 ASISTENTE IA**\n\n- **Empresa:** {nombre_emp}\n- **Progreso:** {progreso}%\n- **Fase:** {fase}/6\n- **Peligros:** {total_peligros}\n- **Capacitaciones:** {total_cap}\n- **Incidentes:** {total_inc}\n\nPregúntame sobre: empresa, progreso, peligros, capacitaciones, incidentes."
 
-# ==================== CSS ====================
+# ==================== CSS (igual, se omite por brevedad, pero se mantiene) ====================
 st.markdown("""
 <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -216,15 +206,6 @@ st.markdown("""
     }
     
     .stProgress > div > div { background-color: #667eea; }
-    
-    .debug-box {
-        background: #1e1e2f;
-        border-left: 4px solid #ff6600;
-        padding: 0.5rem;
-        font-family: monospace;
-        font-size: 0.8rem;
-        margin-top: 1rem;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,7 +223,7 @@ def mostrar_fases():
     for i, fase in enumerate(fases):
         with cols[i]:
             completada = False
-            if fase["num"] == 1 and st.session_state.empresa.get("nombre") and st.session_state.empresa["nombre"].strip() != "":
+            if fase["num"] == 1 and st.session_state.empresa.get("nombre", "").strip() != "":
                 completada = True
             elif fase["num"] == 2 and len(st.session_state.peligros) > 0:
                 completada = True
@@ -290,7 +271,7 @@ def dashboard():
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("🔍 Fase 1", "✅" if st.session_state.empresa.get("nombre") else "⏳")
+        st.metric("🔍 Fase 1", "✅" if st.session_state.empresa.get("nombre", "").strip() else "⏳")
         st.markdown('</div>', unsafe_allow_html=True)
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -314,7 +295,7 @@ def dashboard():
         st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
-    datos = [100 if st.session_state.empresa.get("nombre") else 0,
+    datos = [100 if st.session_state.empresa.get("nombre", "").strip() else 0,
              min(100, len(st.session_state.peligros) * 33),
              min(100, len(st.session_state.matriz_riesgos) * 33),
              min(100, len(st.session_state.plan_accion) * 33),
@@ -325,212 +306,156 @@ def dashboard():
     fig.update_layout(title="Progreso por Fase", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(255,255,255,0.1)', font_color='white', height=400)
     st.plotly_chart(fig, use_container_width=True)
 
-# ==================== FASES ====================
+# ==================== FASES (simplificadas pero funcionales) ====================
 def fase1_diagnostico():
     st.markdown('<div class="main-header"><h1>🔍 Fase 1: Diagnóstico Inicial</h1><p>Registra la información de tu empresa</p></div>', unsafe_allow_html=True)
-    
-    with st.form(key="fase1_form"):
+    with st.form("fase1"):
         col1, col2 = st.columns(2)
         with col1:
             nombre = st.text_input("🏢 Nombre de la empresa", value=st.session_state.empresa.get("nombre", ""))
             nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
         with col2:
-            trabajadores_val = st.session_state.empresa.get("trabajadores", 1)
-            if trabajadores_val < 1:
-                trabajadores_val = 1
-            trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=trabajadores_val)
+            trabajadores = st.number_input("👥 Número de trabajadores", min_value=1, value=st.session_state.empresa.get("trabajadores", 1))
             ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
-        
-        submitted = st.form_submit_button("💾 Guardar Diagnóstico", use_container_width=True)
-        if submitted:
-            if nombre.strip() == "":
-                st.error("❌ El nombre de la empresa es obligatorio.")
-            else:
+        if st.form_submit_button("💾 Guardar Diagnóstico", use_container_width=True):
+            if nombre.strip():
                 st.session_state.empresa["nombre"] = nombre
                 st.session_state.empresa["nit"] = nit
                 st.session_state.empresa["trabajadores"] = trabajadores
                 st.session_state.empresa["ciudad"] = ciudad
-                st.success("✅ ¡Información guardada correctamente! Progreso actualizado.")
+                st.success("✅ Información guardada. Progreso actualizado.")
                 if st.session_state.fase_actual == 1:
                     st.session_state.fase_actual = 2
                     st.rerun()
+            else:
+                st.error("El nombre es obligatorio.")
     
     if st.session_state.empresa.get("nombre"):
         st.markdown("---")
-        st.subheader("📋 Información registrada")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"**🏢 Empresa:** {st.session_state.empresa['nombre']}")
-            st.write(f"**📄 NIT:** {st.session_state.empresa.get('nit', 'No registrado')}")
-        with col2:
-            st.write(f"**👥 Trabajadores:** {st.session_state.empresa['trabajadores']}")
-            st.write(f"**📍 Ciudad:** {st.session_state.empresa.get('ciudad', 'No registrada')}")
+        st.subheader("📋 Información actual")
+        st.write(f"**Empresa:** {st.session_state.empresa['nombre']}")
+        st.write(f"**NIT:** {st.session_state.empresa.get('nit', 'No registrado')}")
+        st.write(f"**Trabajadores:** {st.session_state.empresa['trabajadores']}")
+        st.write(f"**Ciudad:** {st.session_state.empresa.get('ciudad', 'No registrada')}")
 
 def fase2_peligros():
     st.markdown('<div class="main-header"><h1>⚠️ Fase 2: Identificación de Peligros</h1><p>Metodología GTC-45</p></div>', unsafe_allow_html=True)
-    
     tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Nuevo Peligro"])
     with tab1:
         if st.session_state.peligros:
-            df = pd.DataFrame(st.session_state.peligros)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(pd.DataFrame(st.session_state.peligros), use_container_width=True)
             if st.button("✅ Avanzar a Fase 3", use_container_width=True):
                 st.session_state.fase_actual = 3
                 st.rerun()
         else:
-            st.info("No hay peligros identificados")
+            st.info("No hay peligros")
     with tab2:
         with st.form("nuevo_peligro"):
             col1, col2 = st.columns(2)
             with col1:
                 proceso = st.selectbox("Proceso", ["Administrativo", "Operativo", "Mantenimiento", "Logística"])
-                peligro = st.text_input("Descripción del peligro")
+                peligro = st.text_input("Descripción")
                 tipo = st.selectbox("Tipo", ["Biológico", "Físico", "Químico", "Psicosocial", "Ergonómico", "Mecánico"])
             with col2:
-                probabilidad = st.slider("Probabilidad (1-4)", 1, 4, 3)
-                severidad = st.slider("Severidad (1-3)", 1, 3, 2)
-                nivel = calcular_nivel_riesgo(probabilidad, severidad)
-                st.info(f"**Nivel calculado:** {nivel}")
-            controles = st.text_area("Controles existentes")
-            if st.form_submit_button("✅ Identificar Peligro", use_container_width=True):
+                prob = st.slider("Probabilidad (1-4)", 1, 4, 3)
+                sev = st.slider("Severidad (1-3)", 1, 3, 2)
+                nivel = calcular_nivel_riesgo(prob, sev)
+                st.info(f"Nivel: {nivel}")
+            controles = st.text_area("Controles")
+            if st.form_submit_button("Identificar"):
                 if peligro:
                     st.session_state.peligros.append({
                         "proceso": proceso,
                         "peligro": peligro,
                         "tipo": tipo,
-                        "probabilidad": probabilidad,
-                        "severidad": severidad,
+                        "probabilidad": prob,
+                        "severidad": sev,
                         "nivel": nivel,
                         "controles": controles
                     })
-                    st.success(f"✅ Peligro nivel {nivel} identificado")
                     st.rerun()
-                else:
-                    st.error("❌ Complete la descripción")
 
 def fase3_riesgos():
-    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación de Riesgos</h1><p>Análisis de probabilidad y severidad</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>📊 Fase 3: Evaluación de Riesgos</h1></div>', unsafe_allow_html=True)
     if st.session_state.peligros:
         for p in st.session_state.peligros:
-            st.markdown(f'''
-            <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 4px solid #667eea;">
-                <h4>📍 {p["peligro"]}</h4>
-                <p>Proceso: {p["proceso"]} | Prob: {p["probabilidad"]} | Sev: {p["severidad"]} | <strong>Nivel: {p["nivel"]}</strong></p>
-                <p>Controles: {p["controles"]}</p>
-            </div>
-            ''', unsafe_allow_html=True)
-        if st.button("✅ Completar Evaluación", use_container_width=True):
+            st.markdown(f"- {p['peligro']} (Nivel {p['nivel']})")
+        if st.button("Completar evaluación"):
             st.session_state.matriz_riesgos = st.session_state.peligros.copy()
             st.session_state.fase_actual = 4
-            st.success("¡Fase 3 completada!")
             st.rerun()
     else:
-        st.warning("⚠️ Primero identifica peligros en la Fase 2")
+        st.warning("Primero identifica peligros")
 
 def fase4_plan_accion():
-    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción</h1><p>Define acciones correctivas</p></div>', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["📋 Plan Actual", "➕ Nueva Acción"])
+    st.markdown('<div class="main-header"><h1>📋 Fase 4: Plan de Acción</h1></div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["Plan", "Nueva Acción"])
     with tab1:
         if st.session_state.plan_accion:
-            df = pd.DataFrame(st.session_state.plan_accion)
-            st.dataframe(df, use_container_width=True)
-            if st.button("✅ Completar Plan", use_container_width=True):
+            st.dataframe(pd.DataFrame(st.session_state.plan_accion))
+            if st.button("Completar Plan"):
                 st.session_state.fase_actual = 5
-                st.success("¡Fase 4 completada!")
                 st.rerun()
-        else:
-            st.info("No hay acciones")
     with tab2:
         with st.form("nueva_accion"):
-            accion = st.text_area("Acción correctiva")
+            accion = st.text_area("Acción")
             responsable = st.text_input("Responsable")
-            fecha = st.date_input("Fecha límite", datetime.now() + timedelta(days=30))
-            if st.form_submit_button("Agregar", use_container_width=True):
-                if accion:
-                    st.session_state.plan_accion.append({
-                        "accion": accion,
-                        "responsable": responsable,
-                        "fecha": str(fecha),
-                        "estado": "Pendiente"
-                    })
-                    st.success("✅ Acción agregada")
-                    st.rerun()
-
-def fase5_implementacion():
-    st.markdown('<div class="main-header"><h1>🚀 Fase 5: Implementación</h1><p>Programa capacitaciones</p></div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📚 Capacitaciones")
-        with st.form("nueva_capacitacion"):
-            tema = st.text_input("Tema de capacitación")
-            fecha = st.date_input("Fecha", datetime.now() + timedelta(days=7))
-            if st.form_submit_button("Programar", use_container_width=True):
-                if tema:
-                    st.session_state.capacitaciones.append({
-                        "tema": tema,
-                        "fecha": str(fecha),
-                        "estado": "Programada"
-                    })
-                    st.success("✅ Capacitación programada")
-                    st.rerun()
-        if st.session_state.capacitaciones:
-            for c in st.session_state.capacitaciones:
-                st.info(f"📅 {c['tema']} - {c['fecha']}")
-    with col2:
-        st.subheader("✅ Ejecución")
-        for i, a in enumerate(st.session_state.plan_accion):
-            if st.checkbox(f"✓ {a['accion'][:50]}", key=f"check_{i}"):
-                st.session_state.plan_accion[i]['estado'] = "Completada"
-        if len(st.session_state.capacitaciones) >= 1:
-            if st.button("✅ Completar Implementación", use_container_width=True):
-                st.session_state.fase_actual = 6
-                st.success("¡Fase 5 completada!")
+            if st.form_submit_button("Agregar"):
+                st.session_state.plan_accion.append({"accion": accion, "responsable": responsable, "estado": "Pendiente"})
                 st.rerun()
 
+def fase5_implementacion():
+    st.markdown('<div class="main-header"><h1>🚀 Fase 5: Implementación</h1></div>', unsafe_allow_html=True)
+    with st.form("nueva_capacitacion"):
+        tema = st.text_input("Capacitación")
+        if st.form_submit_button("Programar"):
+            st.session_state.capacitaciones.append({"tema": tema, "fecha": str(datetime.now())})
+            st.rerun()
+    if st.session_state.capacitaciones:
+        st.write("Capacitaciones programadas:", len(st.session_state.capacitaciones))
+    if st.button("Completar Implementación"):
+        st.session_state.fase_actual = 6
+        st.rerun()
+
 def fase6_seguimiento():
-    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento y Control</h1><p>Monitorea indicadores</p></div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📊 Indicadores")
-        st.metric("Capacitaciones", len(st.session_state.capacitaciones))
-        st.metric("Peligros", len(st.session_state.peligros))
-        st.metric("Acciones", len(st.session_state.plan_accion))
-    with col2:
-        st.subheader("📋 Incidentes")
-        with st.form("nuevo_incidente"):
-            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Casi accidente"])
-            descripcion = st.text_area("Descripción")
-            if st.form_submit_button("Reportar", use_container_width=True):
-                if descripcion:
-                    st.session_state.incidentes.append({
-                        "tipo": tipo,
-                        "descripcion": descripcion,
-                        "fecha": str(datetime.now())
-                    })
-                    st.success("✅ Reportado")
-                    st.rerun()
-        for i in st.session_state.incidentes:
-            st.warning(f"⚠️ {i['tipo']}: {i['descripcion'][:50]}...")
+    st.markdown('<div class="main-header"><h1>📈 Fase 6: Seguimiento</h1></div>', unsafe_allow_html=True)
+    with st.form("nuevo_incidente"):
+        tipo = st.selectbox("Tipo", ["Accidente", "Incidente"])
+        desc = st.text_area("Descripción")
+        if st.form_submit_button("Reportar"):
+            st.session_state.incidentes.append({"tipo": tipo, "descripcion": desc, "fecha": str(datetime.now())})
+            st.rerun()
     if calcular_progreso() >= 90:
         st.balloons()
-        st.success("🎉 ¡PROYECTO COMPLETADO!")
+        st.success("Proyecto completado")
 
-# ==================== ASISTENTE IA CON RECARGA ====================
+# ==================== ASISTENTE IA ====================
 def asistente_ia():
     st.markdown('<div class="main-header"><h1>🤖 Asistente IA</h1><p>Experto virtual en SST</p></div>', unsafe_allow_html=True)
     mostrar_fases()
     
-    # Botón para forzar recarga de contexto
+    # Botón de recarga manual
     if st.button("🔄 Recargar contexto de IA", use_container_width=True):
-        # Limpiar mensajes para que al recargar se muestren los datos actualizados
-        st.session_state.ia_messages = []
+        st.session_state.ia_messages = []  # Limpiar historial para refrescar
         st.rerun()
+    
+    # Mostrar estado actual en un cuadro de depuración
+    with st.expander("📊 Datos actuales del proyecto (verificar)"):
+        st.json({
+            "Empresa": st.session_state.empresa.get("nombre", ""),
+            "Progreso": calcular_progreso(),
+            "Fase actual": st.session_state.fase_actual,
+            "Peligros": len(st.session_state.peligros),
+            "Capacitaciones": len(st.session_state.capacitaciones),
+            "Incidentes": len(st.session_state.incidentes),
+            "Plan de Acción": len(st.session_state.plan_accion)
+        })
     
     if not st.session_state.ia_messages:
         nombre_emp = st.session_state.empresa.get("nombre", "").strip()
-        if nombre_emp == "":
+        if not nombre_emp:
             nombre_emp = "aún no registrada"
-        bienvenida = f"**🤖 ¡Hola!** Soy tu asistente IA. Tu empresa **{nombre_emp}** tiene un progreso del **{calcular_progreso()}%** (Fase {st.session_state.fase_actual}/6).\n\nPregúntame sobre: **empresa**, **progreso**, **peligros**, **capacitaciones**, **incidentes**."
+        bienvenida = f"**🤖 ¡Hola!** Tu empresa **{nombre_emp}** tiene un progreso del **{calcular_progreso()}%** (Fase {st.session_state.fase_actual}/6).\n\nPregúntame sobre: empresa, progreso, peligros, capacitaciones, incidentes."
         st.session_state.ia_messages = [{"role": "assistant", "content": bienvenida}]
     
     for msg in st.session_state.ia_messages:
@@ -541,7 +466,7 @@ def asistente_ia():
     
     if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
         st.session_state.ia_messages.append({"role": "user", "content": prompt})
-        respuesta = respuesta_ia(prompt)
+        respuesta = responder_ia(prompt)
         st.session_state.ia_messages.append({"role": "assistant", "content": respuesta})
         st.rerun()
 
@@ -553,19 +478,12 @@ else:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
         st.markdown("### 🔄 SG-SST PHVA")
         st.markdown(f"**👤** {st.session_state.username}")
-        
-        # Botón para activar/desactivar modo depuración
-        if st.button("🐞 Modo Depuración", use_container_width=True):
-            st.session_state.debug_mode = not st.session_state.debug_mode
-            st.rerun()
-        
         st.markdown("---")
         fases_nombres = {1:"🔍 Diagnóstico", 2:"⚠️ Peligros", 3:"📊 Riesgos", 4:"📋 Plan", 5:"🚀 Implementación", 6:"📈 Seguimiento"}
         st.markdown(f'<div class="fase-badge"><strong>📍 FASE ACTUAL</strong><br>{fases_nombres[st.session_state.fase_actual]}</div>', unsafe_allow_html=True)
         st.progress(calcular_progreso() / 100)
         st.caption(f"{calcular_progreso()}% completado")
         st.markdown("---")
-        
         menu = st.radio("📋 Módulos", [
             "📊 Dashboard",
             "🔍 Fase 1: Diagnóstico",
@@ -576,21 +494,6 @@ else:
             "📈 Fase 6: Seguimiento",
             "🤖 Asistente IA"
         ])
-        
-        # Depuración: mostrar estado actual de session_state
-        if st.session_state.debug_mode:
-            st.markdown("---")
-            st.markdown("**🔍 DEPURACIÓN**")
-            st.json({
-                "empresa": st.session_state.empresa,
-                "fase_actual": st.session_state.fase_actual,
-                "progreso": calcular_progreso(),
-                "total_peligros": len(st.session_state.peligros),
-                "total_capacitaciones": len(st.session_state.capacitaciones),
-                "total_incidentes": len(st.session_state.incidentes),
-                "total_acciones": len(st.session_state.plan_accion)
-            })
-        
         st.markdown("---")
         st.caption("👨‍💻 Ing. Jan Benitez & Ing. Neiris Pallares")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
