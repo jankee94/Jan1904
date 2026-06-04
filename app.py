@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 import requests
-from core.ia_engine import ia_engine
+import json
+from typing import Optional
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -12,14 +13,62 @@ if "empresa" not in st.session_state:
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 
-def obtener_info_por_nit(nit):
-    """Obtener informacion de empresa usando API publica o inferir por IA"""
-    # Por ahora, la IA inferira basado en el NIT y contexto colombiano
-    return {
-        "nombre": f"Empresa {nit[-6:]}",
-        "sector": "No especificado",
-        "ciudad": "Colombia"
-    }
+def get_gemini_key():
+    try:
+        return st.secrets.get("GEMINI_API_KEY")
+    except:
+        import os
+        return os.environ.get("GEMINI_API_KEY")
+
+def call_gemini(prompt: str) -> Optional[str]:
+    api_key = get_gemini_key()
+    if not api_key:
+        return None
+    
+    try:
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": api_key
+        }
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+                if parts:
+                    return parts[0].get("text", None)
+        return None
+    except Exception as e:
+        st.session_state.ultimo_error = str(e)
+        return None
+
+def test_ia():
+    """Probar conexion con Gemini"""
+    api_key = get_gemini_key()
+    if not api_key:
+        return "❌ API Key no encontrada. Configura GEMINI_API_KEY en Secrets"
+    
+    try:
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        headers = {"Content-Type": "application/json", "X-goog-api-key": api_key}
+        payload = {"contents": [{"parts": [{"text": "Responde solo: OK"}]}]}
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            return "✅ IA conectada correctamente"
+        else:
+            return f"❌ Error HTTP {response.status_code}: {response.text[:200]}"
+    except Exception as e:
+        return f"❌ Error de conexion: {str(e)}"
 
 # Login
 if not st.session_state.authenticated:
@@ -53,7 +102,7 @@ else:
         
         menu = st.radio(
             "Menu Principal",
-            ["🏠 Dashboard", "🔍 Diagnostico IA", "🤖 Asistente IA", "⚠️ Peligros", "📋 Plan Anual"]
+            ["🏠 Dashboard", "🔍 Diagnostico IA", "🤖 Asistente IA", "⚠️ Peligros", "📋 Plan Anual", "🔧 Test IA"]
         )
         
         st.markdown("---")
@@ -73,176 +122,138 @@ else:
                 st.metric("NIT", st.session_state.empresa.get("nit", "N/A"))
             with col3:
                 st.metric("Trabajadores", st.session_state.empresa.get("trabajadores", 0))
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Sector", st.session_state.empresa.get("sector", "Por determinar"))
-            with col2:
-                st.metric("ARL", st.session_state.empresa.get("arl", "No registrada"))
         else:
             st.info("🎯 Ve a 'Diagnostico IA' para comenzar")
     
-    # Diagnostico IA - SOLO 3 CAMPOS
+    # Test IA
+    elif menu == "🔧 Test IA":
+        st.markdown("# 🔧 Prueba de conexion con IA")
+        
+        st.markdown("### Configuracion actual:")
+        api_key = get_gemini_key()
+        if api_key:
+            st.success(f"✅ API Key encontrada: {api_key[:10]}...")
+        else:
+            st.error("❌ API Key NO encontrada")
+        
+        if st.button("🔄 Probar conexion con Gemini"):
+            with st.spinner("Probando..."):
+                resultado = test_ia()
+                if "✅" in resultado:
+                    st.success(resultado)
+                else:
+                    st.error(resultado)
+        
+        st.markdown("---")
+        st.markdown("### Instrucciones para configurar API Key:")
+        st.code("""
+        En Streamlit Cloud:
+        1. Ve a Settings → Secrets
+        2. Agrega:
+           GEMINI_API_KEY = "tu_api_key_aqui"
+        3. Haz clic en Save
+        4. Reboot la app
+        """)
+    
+    # Diagnostico IA
     elif menu == "🔍 Diagnostico IA":
         st.markdown("""
         <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 2rem; border-radius: 20px; margin-bottom: 2rem;">
             <h1 style="color: white; text-align: center;">🔍 Diagnostico con IA</h1>
-            <p style="color: white; text-align: center;">Ingresa solo 3 datos y la IA hará el resto</p>
         </div>
         """, unsafe_allow_html=True)
         
+        # Mostrar estado de IA
+        api_key = get_gemini_key()
+        if not api_key:
+            st.error("⚠️ API Key de Gemini no configurada. Ve a 'Test IA' para instrucciones.")
+        
         with st.form("empresa_form"):
-            st.markdown("### 📋 Datos minimos requeridos")
-            
             col1, col2, col3 = st.columns(3)
             with col1:
-                nit = st.text_input("📄 NIT *", value=st.session_state.empresa.get("nit", ""), 
-                                   placeholder="Ej: 9001234567", help="La IA inferira el resto de la informacion")
+                nit = st.text_input("📄 NIT *", value=st.session_state.empresa.get("nit", ""))
             with col2:
-                trabajadores = st.number_input("👥 Numero de trabajadores *", min_value=1, 
-                                              value=st.session_state.empresa.get("trabajadores", 10))
+                trabajadores = st.number_input("👥 Trabajadores *", min_value=1, value=st.session_state.empresa.get("trabajadores", 10))
             with col3:
-                arl = st.selectbox("🛡️ ARL *", ["Positiva", "Sura", "Colpatria", "Bolivar", "No aplica"],
-                                  index=0)
-            
-            st.markdown("---")
-            st.info("🤖 La IA determinara automaticamente: Nombre de empresa, Sector economico, Ciudad, y riesgos especificos")
+                arl = st.selectbox("🛡️ ARL", ["Positiva", "Sura", "Colpatria", "Bolivar"])
             
             submitted = st.form_submit_button("🚀 Generar Diagnostico con IA", use_container_width=True, type="primary")
         
-        if submitted and nit.strip() and trabajadores >= 1:
-            with st.spinner("🧠 IA analizando NIT y generando diagnostico personalizado..."):
-                # La IA infiere todo
-                prompt_ia = f"""
-                Eres un experto en SST en Colombia.
+        if submitted and nit.strip():
+            with st.spinner("🧠 IA generando diagnostico personalizado..."):
+                prompt = f"""
+                Eres experto en SST para empresas colombianas.
                 
-                Con base en este NIT colombiano: {nit}
-                Numero de trabajadores: {trabajadores}
+                NIT: {nit}
+                Trabajadores: {trabajadores}
                 ARL: {arl}
                 
-                Determina/infiere:
-                1. Nombre probable de la empresa
-                2. Sector economico mas probable (Construccion, Manufactura, Servicios, Mineria, Salud, Comercio)
-                3. Ciudad probable (Bogota, Medellin, Cali, Barranquilla, etc)
+                Genera un diagnostico SST REAL y ESPECIFICO para esta empresa.
+                Incluye:
+                1. Analisis de riesgos segun tamaño de empresa
+                2. Normativa aplicable con articulos especificos
+                3. Plan de accion con plazos en dias
+                4. Presupuesto realista en COP
+                5. Checklist de cumplimiento inmediato
                 
-                Luego genera un DIAGNOSTICO COMPLETO DE SST que incluya:
-                - Riesgos tipicos del sector inferido
-                - Normativa aplicable en Colombia
-                - Acciones prioritarias para los primeros 3 meses
-                - Presupuesto estimado para implementacion basico
-                - Recomendaciones especificas para {trabajadores} trabajadores
-                
-                Responde en español, de forma practica y para PYME.
+                Responde en español, formato profesional.
                 """
                 
-                diagnostico = ia_engine.call_gemini(prompt_ia, "Eres consultor SST especializado en empresas colombianas")
+                respuesta = call_gemini(prompt)
                 
-                if not diagnostico:
-                    diagnostico = ia_engine.call_groq(prompt_ia)
-                
-                if not diagnostico:
-                    # Fallback local
-                    sector_inferido = "Construccion" if "constru" not in nit.lower() else "Servicios"
+                if respuesta:
+                    diagnostico = f"🤖 **DIAGNOSTICO IA (Gemini)**\n\n{respuesta}"
+                    st.session_state.empresa = {"nit": nit, "trabajadores": trabajadores, "arl": arl, "nombre": f"Empresa {nit[-4:]}"}
+                else:
                     diagnostico = f"""
-📋 DIAGNOSTICO GENERADO POR IA
+❌ **ERROR: No se pudo conectar con la IA**
 
-DATOS INFERIDOS:
+**Diagnostico del problema:**
+- API Key: {'Configurada' if api_key else 'NO configurada'}
+- Error: {st.session_state.get('ultimo_error', 'Desconocido')}
+
+**Solucion:**
+1. Ve al menu '🔧 Test IA'
+2. Verifica que la API Key este correcta
+3. Configura GEMINI_API_KEY en Secrets de Streamlit Cloud
+
+**Datos ingresados:**
 - NIT: {nit}
-- Empresa: PYME colombiana
-- Sector: {sector_inferido}
 - Trabajadores: {trabajadores}
 - ARL: {arl}
-
-RIESGOS PRIORITARIOS:
-1. Falta de implementacion del Sistema de Gestion SST
-2. Capacitaciones obligatorias pendientes
-3. Matriz de peligros no actualizada
-
-ACCIONES INMEDIATAS (30 dias):
-1. Constituir COPASST (Comite Paritario)
-2. Elaborar matriz de peligros segun GTC-45
-3. Capacitacion basica SST para todos los trabajadores
-4. Registrar contratos ante ARL
-
-PRESUPUESTO ESTIMADO: ${trabajadores * 150000:,.0f} COP anual
-
-NORMATIVA APLICABLE:
-- Decreto 1072/2015
-- Resolucion 0312/2019
-- Ley 1562/2012
-
-PROXIMOS PASOS:
-✅ Completar este diagnostico
-✅ Generar plan de accion
-✅ Programar capacitaciones
 """
                 
-                # Guardar datos inferidos
-                st.session_state.empresa = {
-                    "nit": nit,
-                    "trabajadores": trabajadores,
-                    "arl": arl,
-                    "nombre": "PYME Colombia",
-                    "sector": "Por determinar",
-                    "ciudad": "Colombia"
-                }
                 st.session_state.diagnostico_actual = diagnostico
         
         if st.session_state.get("diagnostico_actual"):
             st.markdown("---")
-            st.markdown("### 📋 DIAGNOSTICO GENERADO POR IA")
+            st.markdown("### 📋 RESULTADO")
             st.markdown(st.session_state.diagnostico_actual)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button("📥 Descargar Diagnostico", st.session_state.diagnostico_actual, "diagnostico_sst.txt", use_container_width=True)
-            with col2:
-                if st.button("📋 Generar Plan de Accion", use_container_width=True):
-                    st.info("✅ Plan de accion generado. Ve al modulo correspondiente.")
     
     # Asistente IA
     elif menu == "🤖 Asistente IA":
-        st.markdown("# 🤖 Asistente IA - Experto SST")
-        
-        if not st.session_state.empresa.get("nit"):
-            st.warning("⚠️ Primero ve a 'Diagnostico IA' e ingresa el NIT de tu empresa")
-        else:
-            st.info(f"📌 Consultando para: NIT {st.session_state.empresa.get('nit')} | {st.session_state.empresa.get('trabajadores')} trabajadores | ARL {st.session_state.empresa.get('arl')}")
+        st.markdown("# 🤖 Asistente IA")
         
         for msg in st.session_state.chat_messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
         
-        if prompt := st.chat_input("Escribe tu consulta sobre SST..."):
+        if prompt := st.chat_input("Consulta..."):
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
             
             with st.spinner("IA pensando..."):
-                contexto = f"""
-                Empresa con NIT: {st.session_state.empresa.get('nit', 'No registrado')}
-                Trabajadores: {st.session_state.empresa.get('trabajadores', 0)}
-                ARL: {st.session_state.empresa.get('arl', 'No registrada')}
-                """
-                respuesta = ia_engine.responder_chat(prompt, {"contexto": contexto})
+                respuesta = call_gemini(f"Eres experto SST. Responde: {prompt}")
+                if not respuesta:
+                    respuesta = "⚠️ IA no disponible. Verifica la conexion en 'Test IA'"
             
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
             st.session_state.chat_messages.append({"role": "assistant", "content": respuesta})
     
-    elif menu == "⚠️ Peligros":
-        st.markdown("# ⚠️ Matriz de Peligros GTC-45")
-        if st.session_state.empresa.get("nit"):
-            st.info("Modulo en desarrollo - Proximamente podras identificar peligros especificos")
-        else:
-            st.warning("⚠️ Primero completa el diagnostico")
-    
-    elif menu == "📋 Plan Anual":
-        st.markdown("# 📅 Plan Anual SST")
-        if st.session_state.empresa.get("nit"):
-            st.info("Modulo en desarrollo - Proximamente tendras plan anual generado por IA")
-        else:
-            st.warning("⚠️ Primero completa el diagnostico")
+    else:
+        st.info("Modulo en desarrollo")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray;'>SG-SST PHVA - IA que infiere todo desde el NIT</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>SG-SST PHVA</p>", unsafe_allow_html=True)
