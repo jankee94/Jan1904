@@ -31,17 +31,20 @@ def call_gemini(prompt):
 
 if not st.session_state.auth:
     st.title("SG-SST PHVA")
-    u = st.text_input("Usuario")
-    p = st.text_input("Contraseña", type="password")
-    if st.button("Ingresar"):
-        if u == "admin" and p == "sst2024":
-            st.session_state.auth = True
-            st.rerun()
-        else:
-            st.error("Use admin / sst2024")
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        u = st.text_input("Usuario")
+        p = st.text_input("Contraseña", type="password")
+        if st.button("Ingresar"):
+            if u == "admin" and p == "sst2024":
+                st.session_state.auth = True
+                st.rerun()
+            else:
+                st.error("Use admin / sst2024")
 else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
+        st.markdown("### SG-SST PHVA")
         opcion = st.radio("Menu", ["Diagnostico", "Chat", "Test IA"])
         if st.button("Salir"):
             st.session_state.auth = False
@@ -54,13 +57,13 @@ else:
             if not key:
                 st.error("No hay API key")
             else:
-                st.success(f"Key: {key[:10]}...")
-                res = call_gemini("Responde OK")
+                st.success(f"Key encontrada: {key[:15]}...")
+                res = call_gemini("Responde solo: OK")
                 if res:
                     st.success(f"Respuesta: {res}")
                 else:
-                    st.error("Gemini no responde")
-        st.info("Configurar Secrets: GEMINI_API_KEY = tu_key")
+                    st.error("Gemini no responde - Puede ser key invalida o error de red")
+        st.info("Secrets configurado: GEMINI_API_KEY")
     
     elif opcion == "Diagnostico":
         st.title("Diagnostico IA")
@@ -70,12 +73,12 @@ else:
             arl = st.selectbox("ARL", ["Positiva", "Sura", "Colpatria"])
             if st.form_submit_button("Generar"):
                 with st.spinner("IA..."):
-                    prompt = f"NIT:{nit} Trabajadores:{tra} ARL:{arl}. Genera diagnostico SST."
+                    prompt = f"NIT:{nit} Trabajadores:{tra} ARL:{arl}. Genera diagnostico SST completo."
                     res = call_gemini(prompt)
                     if res:
                         st.markdown(res)
                     else:
-                        st.error("IA no disponible. Verifica API key.")
+                        st.error("IA no disponible")
     
     else:
         st.title("Chat IA")
