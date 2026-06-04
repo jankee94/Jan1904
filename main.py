@@ -83,7 +83,7 @@ if menu == "🏠 Dashboard":
     
     if empresa is None:
         st.warning("⚠️ **Primero realiza un Diagnóstico IA**")
-        st.info("Ve a 'Diagnóstico IA' y completa el formulario (NIT, nombre, trabajadores, ARL)")
+        st.info("Ve a 'Diagnóstico IA' e ingresa el NIT o nombre de la empresa")
     else:
         stats = db.obtener_stats()
         
@@ -100,50 +100,48 @@ if menu == "🏠 Dashboard":
         
         st.markdown("---")
         
-        # Mostrar diagnóstico guardado
         if empresa and empresa.get('diagnostico_ia'):
             with st.expander("📋 Ver Diagnóstico IA Generado"):
                 st.markdown(empresa['diagnostico_ia'])
         
-        # Gráficos
         peligros_df = db.obtener_peligros()
         if not peligros_df.empty:
             st.subheader("Distribución de Riesgos por Nivel")
             nivel_counts = peligros_df['nivel_riesgo'].value_counts()
             st.bar_chart(nivel_counts)
-        
-        # Próximas acciones
-        acciones_df = db.obtener_acciones()
-        if not acciones_df.empty:
-            st.subheader("📋 Próximas Acciones")
-            pendientes = acciones_df[acciones_df['estado'] != 'Completada'].head(5)
-            if not pendientes.empty:
-                for _, row in pendientes.iterrows():
-                    st.markdown(f"- **{row['descripcion'][:60]}** → {row['responsable']} (Vence: {row['fecha_limite']})")
 
 # ============================================================
-# DIAGNÓSTICO IA (SIMPLIFICADO)
+# DIAGNÓSTICO IA - CAMPO ÚNICO (NIT o NOMBRE)
 # ============================================================
 elif menu == "🤖 Diagnóstico IA":
     st.title("🤖 Diagnóstico Inteligente con IA")
     st.markdown("La IA analizará tu empresa y generará un **diagnóstico completo**")
     st.markdown("---")
     
-    # Formulario simplificado
     with st.form("diagnostico_form"):
         st.markdown("### 📋 Datos básicos de la empresa")
         
+        # CAMPO ÚNICO: NIT o nombre de la empresa
+        identificador = st.text_input(
+            "NIT o nombre de la empresa *", 
+            value=empresa['nit'] if empresa and empresa.get('nit') else (empresa['nombre'] if empresa else ""),
+            placeholder="Ej: 900.123.456-7 o Mi Empresa S.A.S.",
+            help="Puedes ingresar el NIT o el nombre de tu empresa"
+        )
+        
         col1, col2 = st.columns(2)
         with col1:
-            nit = st.text_input("NIT *", value=empresa['nit'] if empresa else "", 
-                               placeholder="900.123.456-7")
-            nombre = st.text_input("Nombre de la empresa *", value=empresa['nombre'] if empresa else "",
-                                  placeholder="Mi Empresa S.A.S.")
+            trabajadores = st.number_input(
+                "Número de trabajadores *", 
+                min_value=1, 
+                value=int(empresa['trabajadores']) if empresa and empresa.get('trabajadores') else 10
+            )
         with col2:
-            trabajadores = st.number_input("Número de trabajadores *", min_value=1, 
-                                          value=int(empresa['trabajadores']) if empresa else 10)
-            arl = st.selectbox("ARL *", ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"],
-                              index=["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"].index(empresa['arl']) if empresa and empresa['arl'] in ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"] else 0)
+            arl = st.selectbox(
+                "ARL *", 
+                ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"],
+                index=["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"].index(empresa['arl']) if empresa and empresa.get('arl') in ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"] else 0
+            )
         
         st.markdown("---")
         st.caption("🤖 La IA generará automáticamente: actividad económica, peligros, riesgos, plan de acción y requisitos legales")
@@ -151,30 +149,28 @@ elif menu == "🤖 Diagnóstico IA":
         generar = st.form_submit_button("🚀 GENERAR DIAGNÓSTICO CON IA", use_container_width=True)
     
     if generar:
-        if not nit or not nombre:
-            st.error("❌ NIT y Nombre de la empresa son obligatorios")
+        if not identificador:
+            st.error("❌ Debes ingresar el NIT o nombre de la empresa")
         else:
-            with st.spinner("🤖 IA generando diagnóstico completo para tu empresa..."):
-                # Prompt para IA
+            with st.spinner("🤖 IA generando diagnóstico completo..."):
                 prompt = f"""
                 Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia.
-                Basado SOLO en estos datos básicos, genera un diagnóstico SST completo:
+                Basado en estos datos, genera un diagnóstico SST completo:
                 
                 DATOS DE LA EMPRESA:
-                - NIT: {nit}
-                - Nombre: {nombre}
+                - Identificador (NIT o nombre): {identificador}
                 - Número de trabajadores: {trabajadores}
                 - ARL: {arl}
                 
                 INFORME A GENERAR (estructura profesional en Markdown):
                 
                 ## 1. PERFIL DE LA EMPRESA
-                - Inferir actividad económica probable según el nombre
-                - Tamaño de la empresa (micro, pequeña, mediana)
+                - Inferir actividad económica probable según el identificador
+                - Tamaño de la empresa (micro, pequeña, mediana, grande)
                 - Nivel de riesgo según ARL
                 
                 ## 2. PELIGROS IDENTIFICADOS (mínimo 6)
-                Para cada peligro, especificar:
+                Para cada peligro:
                 - **Tipo:** (Físico, Químico, Biológico, Ergonómico, Psicosocial, Seguridad)
                 - **Descripción:** Detalle del peligro
                 - **Ubicación sugerida:** Área donde aplica
@@ -193,8 +189,8 @@ elif menu == "🤖 Diagnóstico IA":
                 - **Prioridad:** Alta/Media/Baja
                 
                 ## 5. REQUISITOS LEGALES APLICABLES
-                - Decreto 1072/2015 (requisitos según tamaño)
-                - Resolución 0312/2019 (estándares mínimos)
+                - Decreto 1072/2015
+                - Resolución 0312/2019
                 - Obligaciones con ARL {arl}
                 
                 ## 6. RECOMENDACIONES GENERALES
@@ -210,51 +206,58 @@ elif menu == "🤖 Diagnóstico IA":
                     respuesta = ia.call_groq(prompt)
                 
                 if respuesta:
-                    # Guardar empresa con diagnóstico
-                    db.guardar_empresa(nit, nombre, trabajadores, arl, "", respuesta)
-                    st.session_state.empresa_nombre = nombre
+                    # Guardar empresa (el identificador va en el campo nombre)
+                    db.guardar_empresa(
+                        nit=identificador if identificador[0].isdigit() else "", 
+                        nombre=identificador, 
+                        trabajadores=trabajadores, 
+                        arl=arl, 
+                        actividad="", 
+                        diagnostico_ia=respuesta
+                    )
+                    st.session_state.empresa_nombre = identificador
                     
                     st.balloons()
                     st.success("✅ **DIAGNÓSTICO GENERADO EXITOSAMENTE**")
                     st.markdown("---")
                     st.markdown(respuesta)
                     
-                    # Extraer y guardar peligros automáticamente desde el diagnóstico
-                    st.info("🤖 **La IA ha identificado peligros. Se han pre-cargado automáticamente en el sistema.**")
-                    
-                    # Guardar peligros típicos según tamaño y actividad
+                    # Guardar peligros pre-cargados según tamaño
                     peligros_base = []
                     
-                    # Peligros según número de trabajadores
                     if trabajadores > 50:
                         peligros_base.extend([
                             ("Ergonómico", "Movimientos repetitivos en línea de producción", "Área operativa", 3, 2),
                             ("Psicosocial", "Estrés laboral por alta carga de trabajo", "Todas las áreas", 3, 2),
-                            ("Seguridad", "Riesgo eléctrico en mantenimiento", "Talleres", 2, 3),
+                            ("Seguridad", "Riesgo eléctrico en mantenimiento industrial", "Talleres", 2, 3),
+                        ])
+                    elif trabajadores > 10:
+                        peligros_base.extend([
+                            ("Ergonómico", "Posturas inadecuadas en trabajo de oficina", "Oficinas", 2, 2),
+                            ("Psicosocial", "Carga laboral y cumplimiento de metas", "Administrativo", 2, 2),
                         ])
                     else:
                         peligros_base.extend([
-                            ("Ergonómico", "Posturas inadecuadas frente a computador", "Oficinas", 2, 2),
-                            ("Psicosocial", "Carga laboral y cumplimiento de metas", "Administrativo", 2, 2),
+                            ("Ergonómico", "Manejo manual de cargas", "Todas las áreas", 2, 2),
+                            ("Seguridad", "Orden y aseo en instalaciones", "Todas las áreas", 2, 1),
                         ])
                     
-                    # Peligros comunes a todas
                     peligros_base.extend([
                         ("Seguridad", "Caídas al mismo nivel por desorden", "Todas las áreas", 2, 2),
-                        ("Físico", "Iluminación inadecuada", "Oficinas y talleres", 2, 1),
-                        ("Biológico", "Exposición a virus/bacterias (COVID-19, gripe)", "Áreas comunes", 2, 2),
+                        ("Físico", "Iluminación inadecuada para la tarea", "Oficinas y talleres", 2, 1),
+                        ("Biológico", "Exposición a virus (COVID-19, influenza)", "Áreas comunes", 2, 2),
+                        ("Físico", "Ruido ambiental", "Áreas operativas", 2, 2),
                     ])
                     
-                    # Guardar en BD
                     for peligro in peligros_base:
                         db.guardar_peligro(1, peligro[0], peligro[1], peligro[2], peligro[3], peligro[4], 1)
                     
-                    # Guardar acciones sugeridas
                     acciones_base = [
-                        ("Realizar matriz de riesgos GTC-45", "Responsable SST", (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"), "Alta"),
+                        ("Realizar matriz de riesgos GTC-45 completa", "Responsable SST", (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"), "Alta"),
                         ("Capacitar a todo el personal en SST", "Coordinador SST", (datetime.now() + timedelta(days=45)).strftime("%Y-%m-%d"), "Alta"),
-                        ("Implementar pausas activas", "Líder de área", (datetime.now() + timedelta(days=15)).strftime("%Y-%m-%d"), "Media"),
+                        ("Implementar pausas activas diarias", "Líder de área", (datetime.now() + timedelta(days=15)).strftime("%Y-%m-%d"), "Media"),
                         ("Revisar y actualizar políticas SST", "Gerencia", (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d"), "Media"),
+                        ("Adquirir EPP según matriz de riesgos", "Compras", (datetime.now() + timedelta(days=20)).strftime("%Y-%m-%d"), "Alta"),
                     ]
                     
                     for accion in acciones_base:
@@ -280,25 +283,15 @@ elif menu == "⚠️ Peligros (Fase 2)":
     
     if empresa is None:
         st.warning("⚠️ **Primero realiza un Diagnóstico IA**")
+        st.info("Ve a 'Diagnóstico IA' e ingresa los datos de tu empresa")
     else:
         tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
         
         with tab1:
             df = db.obtener_peligros()
             if not df.empty:
-                # Mostrar con colores
-                def color_nivel(val):
-                    if val == 'I':
-                        return 'background-color: #ff4444; color: white'
-                    elif val == 'II':
-                        return 'background-color: #ffa500; color: black'
-                    elif val == 'III':
-                        return 'background-color: #ffff00; color: black'
-                    return ''
-                
                 st.dataframe(df[['id', 'tipo', 'descripcion', 'ubicacion', 'nivel_riesgo']], use_container_width=True)
                 
-                # Eliminar
                 with st.expander("🗑️ Eliminar peligro"):
                     id_eliminar = st.number_input("ID a eliminar", min_value=1, step=1)
                     if st.button("Eliminar"):
@@ -348,9 +341,7 @@ elif menu == "📊 Riesgos (Fase 3)":
             with col1:
                 st.metric("Total Peligros", len(peligros_df))
                 nivel1 = len(peligros_df[peligros_df['nivel_riesgo'] == 'I'])
-                st.metric("🔴 Riesgos Nivel I (Alto)", nivel1, delta="Requiere acción" if nivel1 > 0 else "OK")
-                nivel2 = len(peligros_df[peligros_df['nivel_riesgo'] == 'II'])
-                st.metric("🟠 Riesgos Nivel II (Medio)", nivel2)
+                st.metric("🔴 Riesgos Nivel I", nivel1, delta="Requiere acción inmediata" if nivel1 > 0 else "OK")
             with col2:
                 st.subheader("Distribución por Nivel")
                 nivel_counts = peligros_df['nivel_riesgo'].value_counts()
@@ -358,8 +349,6 @@ elif menu == "📊 Riesgos (Fase 3)":
             
             st.markdown("---")
             st.subheader("Matriz de Riesgos Detallada")
-            
-            # Mostrar matriz
             for nivel in ['I', 'II', 'III']:
                 riesgos_nivel = peligros_df[peligros_df['nivel_riesgo'] == nivel]
                 if not riesgos_nivel.empty:
@@ -369,9 +358,8 @@ elif menu == "📊 Riesgos (Fase 3)":
                         st.warning(f"### 🟠 Nivel II - Riesgos Medios")
                     else:
                         st.info(f"### 🟡 Nivel III - Riesgos Bajos")
-                    
                     for _, row in riesgos_nivel.iterrows():
-                        st.markdown(f"- **{row['tipo']}**: {row['descripcion'][:100]} ({row['ubicacion']})")
+                        st.markdown(f"- **{row['tipo']}**: {row['descripcion'][:80]} ({row['ubicacion']})")
         else:
             st.info("📭 No hay peligros registrados")
 
@@ -390,22 +378,20 @@ elif menu == "✅ Acciones (Fase 4)":
             acciones_df = db.obtener_acciones()
             if not acciones_df.empty:
                 for idx, row in acciones_df.iterrows():
-                    with st.container():
-                        col1, col2, col3 = st.columns([3, 1, 1])
-                        with col1:
-                            st.markdown(f"**📌 {row['descripcion']}**")
-                            st.caption(f"👤 {row['responsable']} | 📅 {row['fecha_limite']} | ⚡ {row['prioridad']}")
-                        with col2:
-                            nuevo_estado = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
-                                                       index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
-                                                       key=f"estado_{row['id']}")
-                            if nuevo_estado != row['estado']:
-                                db.actualizar_estado_accion(row['id'], nuevo_estado)
-                                st.rerun()
-                        with col3:
-                            if row['sugerido_ia'] == 1:
-                                st.caption("🤖 Sugerido por IA")
-                        st.markdown("---")
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"**📌 {row['descripcion']}**")
+                        st.caption(f"👤 {row['responsable']} | 📅 {row['fecha_limite']} | ⚡ {row['prioridad']}")
+                        if row['sugerido_ia'] == 1:
+                            st.caption("🤖 Sugerido por IA")
+                    with col2:
+                        nuevo_estado = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
+                                                   index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
+                                                   key=f"estado_{row['id']}")
+                        if nuevo_estado != row['estado']:
+                            db.actualizar_estado_accion(row['id'], nuevo_estado)
+                            st.rerun()
+                    st.markdown("---")
             else:
                 st.info("📭 No hay acciones registradas")
         
@@ -419,7 +405,7 @@ elif menu == "✅ Acciones (Fase 4)":
                 with col2:
                     prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
                 
-                if st.form_submit_button("Guardar Acción"):
+                if st.form_submit_button("💾 Guardar Acción"):
                     if descripcion and responsable:
                         db.guardar_accion(1, 0, descripcion, responsable, fecha_limite, prioridad, 0)
                         st.success("Acción guardada")
@@ -431,31 +417,33 @@ elif menu == "✅ Acciones (Fase 4)":
 elif menu == "👥 Trabajadores":
     st.title("👥 Gestión de Trabajadores")
     
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo Trabajador"])
-    
-    with tab1:
-        df = db.obtener_trabajadores()
-        if not df.empty:
-            st.dataframe(df[['cedula', 'nombre', 'cargo', 'area']], use_container_width=True)
-        else:
-            st.info("📭 No hay trabajadores registrados")
-    
-    with tab2:
-        with st.form("nuevo_trabajador"):
-            col1, col2 = st.columns(2)
-            with col1:
-                cedula = st.text_input("Cédula")
-                nombre = st.text_input("Nombre completo")
-                email = st.text_input("Email")
-            with col2:
-                cargo = st.text_input("Cargo")
-                area = st.text_input("Área")
-            
-            if st.form_submit_button("Registrar Trabajador"):
-                if cedula and nombre:
-                    db.guardar_trabajador(1, cedula, nombre, email, cargo, area)
-                    st.success("Trabajador registrado")
-                    st.rerun()
+    if empresa is None:
+        st.warning("⚠️ Primero realiza un Diagnóstico IA")
+    else:
+        tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo Trabajador"])
+        
+        with tab1:
+            df = db.obtener_trabajadores()
+            if not df.empty:
+                st.dataframe(df[['cedula', 'nombre', 'cargo', 'area']], use_container_width=True)
+            else:
+                st.info("📭 No hay trabajadores registrados")
+        
+        with tab2:
+            with st.form("nuevo_trabajador"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    cedula = st.text_input("Cédula")
+                    nombre = st.text_input("Nombre completo")
+                with col2:
+                    cargo = st.text_input("Cargo")
+                    area = st.text_input("Área")
+                
+                if st.form_submit_button("Registrar Trabajador"):
+                    if cedula and nombre:
+                        db.guardar_trabajador(1, cedula, nombre, "", cargo, area)
+                        st.success("Trabajador registrado")
+                        st.rerun()
 
 # ============================================================
 # INCIDENTES
@@ -463,36 +451,39 @@ elif menu == "👥 Trabajadores":
 elif menu == "📝 Incidentes":
     st.title("📝 Registro de Incidentes")
     
-    with st.form("nuevo_incidente"):
-        col1, col2 = st.columns(2)
-        with col1:
-            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Enfermedad Laboral", "Casi accidente"])
-            fecha = st.date_input("Fecha", datetime.now())
-            lugar = st.text_input("Lugar")
-        with col2:
-            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
-            trabajador_afectado = st.text_input("Trabajador afectado", placeholder="Nombre o cédula")
+    if empresa is None:
+        st.warning("⚠️ Primero realiza un Diagnóstico IA")
+    else:
+        with st.form("nuevo_incidente"):
+            col1, col2 = st.columns(2)
+            with col1:
+                tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Enfermedad Laboral", "Casi accidente"])
+                fecha = st.date_input("Fecha", datetime.now())
+                lugar = st.text_input("Lugar")
+            with col2:
+                gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
+                trabajador_afectado = st.text_input("Trabajador afectado")
+            
+            descripcion = st.text_area("Descripción del incidente")
+            
+            if st.form_submit_button("Registrar Incidente"):
+                if descripcion:
+                    db.guardar_incidente(1, tipo, descripcion, fecha, lugar, gravedad)
+                    st.success("Incidente registrado")
+                    st.rerun()
         
-        descripcion = st.text_area("Descripción del incidente")
-        
-        if st.form_submit_button("Registrar Incidente"):
-            if descripcion:
-                db.guardar_incidente(1, tipo, descripcion, fecha, lugar, gravedad)
-                st.success("Incidente registrado")
-                st.rerun()
-    
-    st.markdown("---")
-    st.subheader("Historial de Incidentes")
-    df = db.obtener_incidentes()
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
+        st.markdown("---")
+        st.subheader("Historial de Incidentes")
+        df = db.obtener_incidentes()
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
 
 # ============================================================
 # CHAT EXPERTO
 # ============================================================
 elif menu == "💬 Chat Experto":
     st.title("💬 Chat Experto en SST")
-    st.markdown("Pregunta sobre normativa, riesgos, o temas de Seguridad y Salud en el Trabajo")
+    st.markdown("Consulta con IA sobre normativa, riesgos y gestión SST")
     
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
@@ -507,7 +498,6 @@ elif menu == "💬 Chat Experto":
             st.markdown(prompt)
         
         with st.spinner("🤖 IA pensando..."):
-            # Contexto de la empresa si existe
             contexto = ""
             if empresa:
                 contexto = f"""
