@@ -1,8 +1,12 @@
 ﻿import streamlit as st
 import sys
 import pandas as pd
+import PyPDF2
+import docx
 from datetime import datetime, timedelta
 from pathlib import Path
+import json
+import re
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -14,33 +18,184 @@ from core.logger import Logger
 
 logger = Logger("main")
 
-# Inicializar sesión
+# ============================================================
+# ESTILOS CSS MODERNOS
+# ============================================================
+st.markdown("""
+<style>
+    /* Fondo moderno */
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Tarjetas modernas */
+    .css-1r6slb0 {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    /* Botones modernos */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    /* Footer */
+    .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        padding: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        font-size: 14px;
+        z-index: 999;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# FUNCIONES DE LECTURA DE DOCUMENTOS
+# ============================================================
+def leer_pdf(file):
+    """Extrae texto de PDF"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(file)
+        texto = ""
+        for page in pdf_reader.pages:
+            texto += page.extract_text()
+        return texto
+    except:
+        return ""
+
+def leer_docx(file):
+    """Extrae texto de Word"""
+    try:
+        doc = docx.Document(file)
+        texto = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        return texto
+    except:
+        return ""
+
+def leer_excel(file):
+    """Lee archivo Excel"""
+    try:
+        df = pd.read_excel(file)
+        return df.to_string()
+    except:
+        return ""
+
+def leer_txt(file):
+    """Lee archivo TXT"""
+    try:
+        texto = file.read().decode("utf-8")
+        return texto
+    except:
+        return ""
+
+def extraer_informacion_con_ia(texto, tipo_info):
+    """IA extrae información específica del documento"""
+    prompt = f"""
+    Extrae del siguiente texto la información de {tipo_info}:
+    
+    TEXTO:
+    {texto[:3000]}
+    
+    Devuelve SOLO JSON con:
+    - datos_encontrados: lista de items encontrados
+    - confianza: porcentaje de confianza
+    - sugerencias: campos que faltan
+    
+    Formato JSON:
+    {{"datos_encontrados": [], "confianza": 0, "sugerencias": []}}
+    """
+    
+    respuesta = ia.call_best(prompt)
+    try:
+        # Intentar extraer JSON
+        json_match = re.search(r'\{.*\}', respuesta, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+    except:
+        pass
+    return {"datos_encontrados": [], "confianza": 0, "sugerencias": []}
+
+# ============================================================
+# INICIALIZAR SESIÓN
+# ============================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "empresa_id" not in st.session_state:
     st.session_state.empresa_id = 1
+if "checklist" not in st.session_state:
+    st.session_state.checklist = {
+        "diagnostico": False,
+        "peligros": False,
+        "trabajadores": False,
+        "acciones": False,
+        "incidentes": False
+    }
 
 # ============================================================
-# LOGIN
+# LOGIN MODERNO
 # ============================================================
 if not st.session_state.authenticated:
-    st.title("🔐 SG-SST PHVA")
-    st.markdown("### Sistema de Gestión de Seguridad y Salud en el Trabajo")
-    
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        user = st.text_input("Usuario")
-        pwd = st.text_input("Contraseña", type="password")
-        if st.button("Ingresar"):
-            if user == "admin" and pwd == "sst2024":
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("❌ Usuario: admin / Contraseña: sst2024")
+        st.markdown("""
+        <div style='
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        '>
+            <h1 style='color: #667eea; font-size: 48px;'>🔄</h1>
+            <h1 style='color: #333;'>SG-SST PHVA</h1>
+            <p style='color: #666;'>Sistema de Gestión de Seguridad y Salud</p>
+            <p style='color: #999;'>Nivel DIOS - IA Protagonista</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            user = st.text_input("Usuario", placeholder="admin", key="login_user")
+            pwd = st.text_input("Contraseña", type="password", placeholder="••••••", key="login_pwd")
+            
+            if st.form_submit_button("🚀 ACCEDER", use_container_width=True):
+                if user == "admin" and pwd == "sst2024":
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario: admin / Contraseña: sst2024")
+        
+        # Footer en login
+        st.markdown("""
+        <div style='text-align: center; margin-top: 30px;'>
+            <p style='color: white; font-size: 16px; font-weight: bold;'>
+                DESARROLLADO POR<br>
+                <span style='font-size: 24px; letter-spacing: 2px;'>JAN BENITEZ</span>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
     st.stop()
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR CON PROGRESO
 # ============================================================
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=80)
@@ -49,8 +204,30 @@ with st.sidebar:
     if empresa:
         st.markdown(f"**🏢 {empresa.get('nombre', 'Empresa')[:30]}**")
         st.caption(f"📊 {empresa.get('trabajadores', 0)} trabajadores")
-    else:
-        st.markdown("**🏢 Sin empresa registrada**")
+    
+    st.markdown("---")
+    
+    # CHECKLIST DE PROGRESO
+    st.markdown("### 📋 Progreso del Sistema")
+    
+    check_items = {
+        "diagnostico": "🤖 Diagnóstico IA",
+        "peligros": "⚠️ Peligros (Fase 2)",
+        "trabajadores": "👥 Trabajadores",
+        "acciones": "✅ Plan de Acción",
+        "incidentes": "📝 Incidentes"
+    }
+    
+    completados = 0
+    for key, label in check_items.items():
+        if st.session_state.checklist[key]:
+            st.markdown(f"✅ {label}")
+            completados += 1
+        else:
+            st.markdown(f"⬜ {label}")
+    
+    st.progress(completados / len(check_items))
+    st.caption(f"Completado: {completados}/{len(check_items)} módulos")
     
     st.markdown("---")
     
@@ -75,168 +252,120 @@ with st.sidebar:
 # ============================================================
 empresa = db.obtener_empresa()
 
+# Actualizar checklist
+st.session_state.checklist["diagnostico"] = empresa is not None
+st.session_state.checklist["peligros"] = len(db.obtener_peligros()) > 0
+st.session_state.checklist["trabajadores"] = len(db.obtener_trabajadores()) > 0
+st.session_state.checklist["acciones"] = len(db.obtener_acciones()) > 0
+st.session_state.checklist["incidentes"] = len(db.obtener_incidentes()) > 0
+
 # ============================================================
 # DASHBOARD
 # ============================================================
 if menu == "🏠 Dashboard":
     st.title("📊 Dashboard SST")
     
-    if empresa is None:
-        st.warning("⚠️ **Primero realiza un Diagnóstico IA**")
-        st.info("Ve a 'Diagnóstico IA' e ingresa el NIT o nombre de la empresa")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("🏢 Estado", "Configurado" if empresa else "Pendiente")
+    with col2:
+        st.metric("⚠️ Peligros", len(db.obtener_peligros()))
+    with col3:
+        st.metric("✅ Acciones", len(db.obtener_acciones()))
+    with col4:
+        progreso = sum(st.session_state.checklist.values()) / len(st.session_state.checklist) * 100
+        st.metric("📈 Progreso", f"{progreso:.0f}%")
+    
+    st.markdown("---")
+    
+    # Mostrar qué falta
+    st.subheader("📋 Pendientes por completar")
+    faltantes = [label for key, label in check_items.items() if not st.session_state.checklist[key]]
+    if faltantes:
+        for item in faltantes:
+            st.warning(f"⬜ {item}")
     else:
-        stats = db.obtener_stats()
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("🏢 Empresa", empresa.get('nombre', '-')[:25])
-        with col2:
-            st.metric("👥 Trabajadores", empresa.get('trabajadores', 0))
-        with col3:
-            st.metric("⚠️ Peligros", stats['total_peligros'])
-        with col4:
-            progreso = stats['acciones_completadas'] / stats['total_acciones'] * 100 if stats['total_acciones'] > 0 else 0
-            st.metric("✅ Progreso", f"{progreso:.0f}%")
-        
-        st.markdown("---")
-        
-        if empresa and empresa.get('diagnostico_ia'):
-            with st.expander("📋 Ver Diagnóstico IA Generado"):
-                st.markdown(empresa['diagnostico_ia'])
-        
-        peligros_df = db.obtener_peligros()
-        if not peligros_df.empty:
-            st.subheader("Distribución de Riesgos por Nivel")
-            nivel_counts = peligros_df['nivel_riesgo'].value_counts()
-            st.bar_chart(nivel_counts)
+        st.success("🎉 ¡Sistema completado al 100%!")
+    
+    if empresa and empresa.get('diagnostico_ia'):
+        with st.expander("📋 Ver Diagnóstico IA"):
+            st.markdown(empresa['diagnostico_ia'])
 
 # ============================================================
-# DIAGNÓSTICO IA - CAMPO ÚNICO
+# DIAGNÓSTICO IA - CON CARGA DE DOCUMENTOS
 # ============================================================
 elif menu == "🤖 Diagnóstico IA":
     st.title("🤖 Diagnóstico Inteligente con IA")
-    st.markdown("La IA analizará tu empresa y generará un **diagnóstico completo**")
     st.markdown("---")
     
-    with st.form("diagnostico_form"):
-        st.markdown("### 📋 Datos básicos de la empresa")
-        
-        identificador = st.text_input(
-            "NIT o nombre de la empresa *", 
-            value=empresa['nit'] if empresa and empresa.get('nit') else (empresa['nombre'] if empresa else ""),
-            placeholder="Ej: 900.123.456-7 o Mi Empresa S.A.S."
-        )
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            trabajadores = st.number_input(
-                "Número de trabajadores *", 
-                min_value=1, 
-                value=int(empresa['trabajadores']) if empresa and empresa.get('trabajadores') else 10
-            )
-        with col2:
-            arl = st.selectbox(
-                "ARL *", 
-                ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"],
-                index=["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"].index(empresa['arl']) if empresa and empresa.get('arl') in ["Positiva", "Sura", "Colpatria", "Bolivar", "Otra"] else 0
-            )
-        
-        st.markdown("---")
-        st.caption("🤖 La IA generará automáticamente: actividad económica, peligros, riesgos, plan de acción y requisitos legales")
-        
-        generar = st.form_submit_button("🚀 GENERAR DIAGNÓSTICO CON IA", use_container_width=True)
+    tab1, tab2 = st.tabs(["📝 Datos básicos", "📄 Carga masiva de documentos"])
     
-    if generar:
-        if not identificador:
-            st.error("❌ Debes ingresar el NIT o nombre de la empresa")
-        else:
-            with st.spinner("🤖 IA generando diagnóstico completo..."):
-                prompt = f"""
-                Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia.
-                Basado en estos datos, genera un diagnóstico SST completo:
-                
-                DATOS DE LA EMPRESA:
-                - Identificador (NIT o nombre): {identificador}
-                - Número de trabajadores: {trabajadores}
-                - ARL: {arl}
-                
-                INFORME A GENERAR (estructura profesional en Markdown):
-                
-                ## 1. PERFIL DE LA EMPRESA
-                ## 2. PELIGROS IDENTIFICADOS (mínimo 6)
-                ## 3. RIESGOS PRIORITARIOS
-                ## 4. PLAN DE ACCIÓN SUGERIDO (mínimo 4 acciones)
-                ## 5. REQUISITOS LEGALES APLICABLES
-                ## 6. RECOMENDACIONES GENERALES
-                """
-                
-                respuesta = ia.call_best(prompt)  # Usar call_best que intenta Gemini y Groq
-                
-                if respuesta:
-                    db.guardar_empresa(
-                        nit=identificador if identificador[0].isdigit() else "", 
-                        nombre=identificador, 
-                        trabajadores=trabajadores, 
-                        arl=arl, 
-                        actividad="", 
-                        diagnostico_ia=respuesta
-                    )
-                    st.session_state.empresa_nombre = identificador
-                    
-                    st.balloons()
-                    st.success("✅ **DIAGNÓSTICO GENERADO EXITOSAMENTE**")
-                    st.markdown("---")
-                    st.markdown(respuesta)
-                    
-                    # Guardar peligros base
-                    peligros_base = [
-                        ("Seguridad", "Caídas al mismo nivel", "Todas las áreas", 2, 2),
-                        ("Ergonómico", "Posturas inadecuadas", "Oficinas", 2, 2),
-                        ("Psicosocial", "Estrés laboral", "Administrativo", 2, 2),
-                        ("Físico", "Iluminación inadecuada", "Todas las áreas", 2, 1),
-                        ("Biológico", "Exposición a virus", "Áreas comunes", 2, 2),
-                    ]
-                    
-                    for peligro in peligros_base:
-                        db.guardar_peligro(1, peligro[0], peligro[1], peligro[2], peligro[3], peligro[4], 1)
-                    
-                    acciones_base = [
-                        ("Realizar matriz de riesgos GTC-45", "Responsable SST", (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d"), "Alta"),
-                        ("Capacitar personal en SST", "Coordinador SST", (datetime.now() + timedelta(days=45)).strftime("%Y-%m-%d"), "Alta"),
-                        ("Implementar pausas activas", "Líder de área", (datetime.now() + timedelta(days=15)).strftime("%Y-%m-%d"), "Media"),
-                    ]
-                    
-                    for accion in acciones_base:
-                        db.guardar_accion(1, 0, accion[0], accion[1], accion[2], accion[3], 1)
-                    
-                    st.success(f"✅ Se han pre-cargado {len(peligros_base)} peligros y {len(acciones_base)} acciones")
+    with tab1:
+        with st.form("diagnostico_form"):
+            identificador = st.text_input("Nombre de la empresa *", placeholder="Mi Empresa S.A.S.")
+            trabajadores = st.number_input("Número de trabajadores *", min_value=1, value=10)
+            arl = st.selectbox("ARL *", ["Positiva", "Sura", "Colpatria", "Bolivar"])
+            
+            if st.form_submit_button("🚀 Generar Diagnóstico", use_container_width=True):
+                if identificador:
+                    with st.spinner("🤖 IA generando diagnóstico..."):
+                        prompt = f"Genera diagnóstico SST para {identificador} con {trabajadores} trabajadores, ARL {arl}. Resumen ejecutivo corto de máximo 500 palabras."
+                        respuesta = ia.call_best(prompt)
+                        
+                        if respuesta:
+                            db.guardar_empresa("", identificador, trabajadores, arl, "", respuesta)
+                            st.success("✅ Diagnóstico guardado")
+                            st.rerun()
+    
+    with tab2:
+        st.subheader("📄 Carga documentos de tu empresa")
+        st.info("La IA leerá los documentos y extraerá automáticamente la información")
+        
+        archivo = st.file_uploader("Sube documento (PDF, Word, Excel, TXT)", 
+                                   type=['pdf', 'docx', 'xlsx', 'xls', 'txt'])
+        
+        if archivo:
+            with st.spinner("🤖 IA leyendo documento..."):
+                # Leer según tipo
+                if archivo.type == "application/pdf":
+                    texto = leer_pdf(archivo)
+                elif archivo.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                    texto = leer_docx(archivo)
+                elif archivo.type in ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
+                    texto = leer_excel(archivo)
                 else:
-                    st.error("❌ Error al generar diagnóstico. Verifica las API keys en Secrets.")
+                    texto = leer_txt(archivo)
+                
+                if texto:
+                    # Extraer info con IA
+                    info_empresa = extraer_informacion_con_ia(texto, "nombre de empresa, número de trabajadores, ARL")
+                    st.success(f"✅ Documento procesado - Confianza: {info_empresa.get('confianza', 0)}%")
+                    
+                    if info_empresa.get('datos_encontrados'):
+                        st.json(info_empresa['datos_encontrados'])
+                        
+                        # Guardar automáticamente
+                        nombre = info_empresa['datos_encontrados'][0] if info_empresa['datos_encontrados'] else "Empresa"
+                        db.guardar_empresa("", nombre, 10, "Positiva", "", texto[:2000])
+                        st.rerun()
+                else:
+                    st.error("No se pudo leer el documento")
 
 # ============================================================
-# PELIGROS (Fase 2)
+# PELIGROS - CARGA MASIVA
 # ============================================================
 elif menu == "⚠️ Peligros (Fase 2)":
-    st.title("⚠️ FASE 2: Identificar Peligros (GTC-45)")
+    st.title("⚠️ FASE 2: Identificar Peligros")
     
     if empresa is None:
-        st.warning("⚠️ **Primero realiza un Diagnóstico IA**")
+        st.warning("Primero realiza el Diagnóstico IA")
     else:
-        tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
+        tab1, tab2, tab3 = st.tabs(["📋 Lista", "➕ Manual", "📤 Carga Masiva"])
         
         with tab1:
             df = db.obtener_peligros()
             if not df.empty:
-                st.dataframe(df[['id', 'tipo', 'descripcion', 'ubicacion', 'nivel_riesgo']], use_container_width=True)
-                
-                with st.expander("🗑️ Eliminar peligro"):
-                    id_eliminar = st.number_input("ID a eliminar", min_value=1, step=1)
-                    if st.button("Eliminar"):
-                        db.eliminar_peligro(id_eliminar)
-                        st.success("Eliminado")
-                        st.rerun()
-            else:
-                st.info("📭 No hay peligros registrados")
+                st.dataframe(df, use_container_width=True)
         
         with tab2:
             with st.form("nuevo_peligro"):
@@ -244,133 +373,122 @@ elif menu == "⚠️ Peligros (Fase 2)":
                 with col1:
                     tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
                     descripcion = st.text_area("Descripción")
-                    ubicacion = st.text_input("Ubicación/Área")
                 with col2:
-                    prob = st.slider("Probabilidad (1-4)", 1, 4, 2)
-                    sev = st.slider("Severidad (1-3)", 1, 3, 2)
+                    prob = st.slider("Probabilidad", 1, 4, 2)
+                    sev = st.slider("Severidad", 1, 3, 2)
                     nivel = db.calcular_nivel(prob, sev)
-                    if nivel == "I":
-                        st.error(f"🔴 NIVEL I - RIESGO ALTO")
-                    elif nivel == "II":
-                        st.warning(f"🟠 NIVEL II - RIESGO MEDIO")
-                    else:
-                        st.info(f"🟡 NIVEL III - RIESGO BAJO")
-                
-                if st.form_submit_button("💾 Guardar Peligro"):
-                    if descripcion:
-                        db.guardar_peligro(1, tipo, descripcion, ubicacion, prob, sev, 0)
-                        st.success("Peligro guardado")
-                        st.rerun()
-
-# ============================================================
-# RIESGOS (Fase 3) - simplificado
-# ============================================================
-elif menu == "📊 Riesgos (Fase 3)":
-    st.title("📊 FASE 3: Evaluación de Riesgos")
-    
-    if empresa is None:
-        st.warning("⚠️ Primero realiza un Diagnóstico IA")
-    else:
-        peligros_df = db.obtener_peligros()
-        
-        if not peligros_df.empty:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Total Peligros", len(peligros_df))
-                nivel1 = len(peligros_df[peligros_df['nivel_riesgo'] == 'I'])
-                st.metric("🔴 Riesgos Nivel I", nivel1)
-            with col2:
-                nivel_counts = peligros_df['nivel_riesgo'].value_counts()
-                st.bar_chart(nivel_counts)
-            
-            st.markdown("---")
-            st.subheader("Matriz de Riesgos")
-            for nivel in ['I', 'II', 'III']:
-                riesgos_nivel = peligros_df[peligros_df['nivel_riesgo'] == nivel]
-                if not riesgos_nivel.empty:
-                    if nivel == 'I':
-                        st.error(f"### 🔴 Nivel I")
-                    elif nivel == 'II':
-                        st.warning(f"### 🟠 Nivel II")
-                    else:
-                        st.info(f"### 🟡 Nivel III")
-                    for _, row in riesgos_nivel.iterrows():
-                        st.markdown(f"- **{row['tipo']}**: {row['descripcion'][:60]}")
-        else:
-            st.info("📭 No hay peligros registrados")
-
-# ============================================================
-# ACCIONES (Fase 4) - simplificado
-# ============================================================
-elif menu == "✅ Acciones (Fase 4)":
-    st.title("✅ FASE 4: Plan de Acción")
-    
-    if empresa is None:
-        st.warning("⚠️ Primero realiza un Diagnóstico IA")
-    else:
-        tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva Acción"])
-        
-        with tab1:
-            acciones_df = db.obtener_acciones()
-            if not acciones_df.empty:
-                for idx, row in acciones_df.iterrows():
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**📌 {row['descripcion']}**")
-                        st.caption(f"Responsable: {row['responsable']} | Límite: {row['fecha_limite']}")
-                    with col2:
-                        nuevo_estado = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
-                                                   index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
-                                                   key=f"estado_{row['id']}")
-                        if nuevo_estado != row['estado']:
-                            db.actualizar_estado_accion(row['id'], nuevo_estado)
-                            st.rerun()
-                    st.markdown("---")
-            else:
-                st.info("📭 No hay acciones registradas")
-        
-        with tab2:
-            with st.form("nueva_accion"):
-                descripcion = st.text_area("Descripción")
-                responsable = st.text_input("Responsable")
-                fecha_limite = st.date_input("Fecha límite", datetime.now())
-                prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
+                    st.info(f"Nivel: {nivel}")
                 
                 if st.form_submit_button("Guardar"):
-                    if descripcion and responsable:
-                        db.guardar_accion(1, 0, descripcion, responsable, fecha_limite, prioridad, 0)
-                        st.success("Guardado")
-                        st.rerun()
+                    db.guardar_peligro(1, tipo, descripcion, "", prob, sev, 0)
+                    st.success("Guardado")
+                    st.rerun()
+        
+        with tab3:
+            st.subheader("Carga masiva de peligros")
+            archivo = st.file_uploader("Excel con peligros", type=['xlsx', 'xls'], key="peligros_file")
+            if archivo:
+                df_carga = pd.read_excel(archivo)
+                st.dataframe(df_carga.head())
+                if st.button("Cargar {len(df_carga)} peligros"):
+                    for _, row in df_carga.iterrows():
+                        db.guardar_peligro(1, row.get('tipo', 'Seguridad'), row.get('descripcion', ''), 
+                                         row.get('ubicacion', ''), row.get('probabilidad', 2), 
+                                         row.get('severidad', 2), 0)
+                    st.success("Carga completada")
+                    st.rerun()
 
 # ============================================================
-# TRABAJADORES
+# TRABAJADORES - CARGA MASIVA
 # ============================================================
 elif menu == "👥 Trabajadores":
     st.title("👥 Gestión de Trabajadores")
     
-    if empresa is None:
-        st.warning("⚠️ Primero realiza un Diagnóstico IA")
-    else:
-        tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
-        
-        with tab1:
-            df = db.obtener_trabajadores()
-            if not df.empty:
-                st.dataframe(df[['cedula', 'nombre', 'cargo', 'area']], use_container_width=True)
-            else:
-                st.info("📭 No hay trabajadores")
-        
-        with tab2:
-            with st.form("nuevo_trabajador"):
+    tab1, tab2, tab3 = st.tabs(["📋 Lista", "➕ Manual", "📤 Carga Masiva"])
+    
+    with tab1:
+        df = db.obtener_trabajadores()
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+    
+    with tab2:
+        with st.form("nuevo_trabajador"):
+            col1, col2 = st.columns(2)
+            with col1:
                 cedula = st.text_input("Cédula")
                 nombre = st.text_input("Nombre")
+            with col2:
                 cargo = st.text_input("Cargo")
                 area = st.text_input("Área")
-                if st.form_submit_button("Guardar"):
-                    if cedula and nombre:
-                        db.guardar_trabajador(1, cedula, nombre, "", cargo, area)
-                        st.success("Guardado")
+            if st.form_submit_button("Guardar"):
+                db.guardar_trabajador(1, cedula, nombre, "", cargo, area)
+                st.success("Guardado")
+                st.rerun()
+    
+    with tab3:
+        st.subheader("Carga masiva de trabajadores")
+        archivo = st.file_uploader("Excel con trabajadores", type=['xlsx', 'xls'], key="trabajadores_file")
+        if archivo:
+            df_carga = pd.read_excel(archivo)
+            st.dataframe(df_carga.head())
+            if st.button(f"Cargar {len(df_carga)} trabajadores"):
+                for _, row in df_carga.iterrows():
+                    db.guardar_trabajador(1, str(row.get('cedula', '')), row.get('nombre', ''), 
+                                         row.get('email', ''), row.get('cargo', ''), row.get('area', ''))
+                st.success("Carga completada")
+                st.rerun()
+
+# ============================================================
+# RIESGOS (Fase 3)
+# ============================================================
+elif menu == "📊 Riesgos (Fase 3)":
+    st.title("📊 FASE 3: Evaluación de Riesgos")
+    
+    peligros_df = db.obtener_peligros()
+    if not peligros_df.empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total", len(peligros_df))
+            nivel1 = len(peligros_df[peligros_df['nivel_riesgo'] == 'I'])
+            st.metric("Nivel I", nivel1)
+        with col2:
+            st.bar_chart(peligros_df['nivel_riesgo'].value_counts())
+    else:
+        st.info("Registra peligros primero")
+
+# ============================================================
+# ACCIONES (Fase 4)
+# ============================================================
+elif menu == "✅ Acciones (Fase 4)":
+    st.title("✅ FASE 4: Plan de Acción")
+    
+    tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva"])
+    
+    with tab1:
+        df = db.obtener_acciones()
+        if not df.empty:
+            for _, row in df.iterrows():
+                col1, col2 = st.columns([3,1])
+                with col1:
+                    st.markdown(f"**{row['descripcion']}**")
+                    st.caption(f"Responsable: {row['responsable']}")
+                with col2:
+                    nuevo = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
+                                        index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
+                                        key=f"acc_{row['id']}")
+                    if nuevo != row['estado']:
+                        db.actualizar_estado_accion(row['id'], nuevo)
                         st.rerun()
+                st.markdown("---")
+    
+    with tab2:
+        with st.form("nueva"):
+            desc = st.text_area("Descripción")
+            responsable = st.text_input("Responsable")
+            if st.form_submit_button("Guardar"):
+                db.guardar_accion(1, 0, desc, responsable, datetime.now().strftime("%Y-%m-%d"), "Media", 0)
+                st.success("Guardado")
+                st.rerun()
 
 # ============================================================
 # INCIDENTES
@@ -378,25 +496,18 @@ elif menu == "👥 Trabajadores":
 elif menu == "📝 Incidentes":
     st.title("📝 Incidentes")
     
-    if empresa is None:
-        st.warning("⚠️ Primero realiza un Diagnóstico IA")
-    else:
-        with st.form("nuevo_incidente"):
-            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Enfermedad Laboral"])
-            descripcion = st.text_area("Descripción")
-            fecha = st.date_input("Fecha", datetime.now())
-            lugar = st.text_input("Lugar")
-            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
-            
-            if st.form_submit_button("Registrar"):
-                db.guardar_incidente(1, tipo, descripcion, fecha, lugar, gravedad)
-                st.success("Registrado")
-                st.rerun()
-        
-        st.markdown("---")
-        df = db.obtener_incidentes()
-        if not df.empty:
-            st.dataframe(df)
+    with st.form("nuevo"):
+        desc = st.text_area("Descripción")
+        fecha = st.date_input("Fecha", datetime.now())
+        if st.form_submit_button("Registrar"):
+            db.guardar_incidente(1, "Incidente", desc, fecha, "", "Leve")
+            st.success("Registrado")
+            st.rerun()
+    
+    st.markdown("---")
+    df = db.obtener_incidentes()
+    if not df.empty:
+        st.dataframe(df)
 
 # ============================================================
 # CHAT IA
@@ -404,24 +515,28 @@ elif menu == "📝 Incidentes":
 elif menu == "💬 Chat Experto":
     st.title("💬 Chat Experto SST")
     
-    if "chat" not in st.session_state:
-        st.session_state.chat = []
+    if "msgs" not in st.session_state:
+        st.session_state.msgs = []
     
-    for msg in st.session_state.chat:
+    for msg in st.session_state.msgs:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     
-    if prompt := st.chat_input("Pregunta sobre SST..."):
-        st.session_state.chat.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("Pregunta..."):
+        st.session_state.msgs.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        contexto = ""
-        if empresa:
-            contexto = f"Contexto: Empresa {empresa.get('nombre', '')} con {empresa.get('trabajadores', 0)} trabajadores.\n"
-        
-        respuesta = ia.call_best(f"{contexto}Pregunta SST: {prompt}")
-        
+        respuesta = ia.call_best(prompt)
         with st.chat_message("assistant"):
-            st.markdown(respuesta or "Error - Verifica API keys")
-        st.session_state.chat.append({"role": "assistant", "content": respuesta or "Error"})
+            st.markdown(respuesta or "Error")
+        st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
+
+# ============================================================
+# FOOTER GLOBAL
+# ============================================================
+st.markdown("""
+<div class='footer'>
+    <strong>DESARROLLADO POR JAN BENITEZ</strong> | SG-SST PHVA Nivel DIOS | IA Protagonista
+</div>
+""", unsafe_allow_html=True)
