@@ -5,7 +5,6 @@ import streamlit as st
 import requests
 import json
 from typing import Optional, Dict, Any
-from datetime import datetime
 
 class IAEngine:
     def __init__(self):
@@ -30,10 +29,10 @@ class IAEngine:
         if not self.gemini_key:
             return None
         try:
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+            url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
             headers = {
                 "Content-Type": "application/json",
-                "X-goog-api-key": self.gemini_key
+                "x-goog-api-key": self.gemini_key
             }
             full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
             payload = {
@@ -54,7 +53,6 @@ class IAEngine:
                     parts = content.get("parts", [])
                     if parts:
                         return parts[0].get("text", None)
-                return None
             return None
         except Exception as e:
             return None
@@ -80,22 +78,21 @@ class IAEngine:
                 if choices:
                     message = choices[0].get("message", {})
                     return message.get("content", None)
-                return None
             return None
         except Exception as e:
             return None
     
     def generar_diagnostico(self, empresa_data: Dict) -> str:
         prompt = f"""
-DATOS DE LA EMPRESA:
-- Nombre: {empresa_data.get('nombre', 'No registrado')}
-- Sector: {empresa_data.get('sector', 'No especificado')}
-- Trabajadores: {empresa_data.get('trabajadores', 0)}
-
-Genera un DIAGNOSTICO INICIAL DE SST para PYME en Colombia.
-Incluye: riesgos del sector, normativa aplicable, acciones prioritarias.
-"""
-        respuesta = self.call_gemini(prompt, "Eres un consultor experto en SST")
+        DATOS:
+        - NIT: {empresa_data.get('nit', 'No')}
+        - Trabajadores: {empresa_data.get('trabajadores', 0)}
+        - ARL: {empresa_data.get('arl', 'No')}
+        
+        Genera diagnostico SST para PYME en Colombia.
+        Incluye: riesgos, normativa, acciones, presupuesto.
+        """
+        respuesta = self.call_gemini(prompt, "Eres experto SST en Colombia")
         if respuesta:
             return f"🤖 Diagnostico IA:\n\n{respuesta}"
         respuesta = self.call_groq(prompt)
@@ -104,29 +101,29 @@ Incluye: riesgos del sector, normativa aplicable, acciones prioritarias.
         return self._diagnostico_local(empresa_data)
     
     def _diagnostico_local(self, empresa_data: Dict) -> str:
-        sector = empresa_data.get('sector', 'General')
-        if sector == "Construccion":
-            return """
-DIAGNOSTICO - CONSTRUCCION
-Riesgos: Trabajo en alturas, maquinaria pesada
-Acciones: Implementar lineas de vida, capacitaciones
-Presupuesto: $2-5 millones COP
-"""
-        else:
-            return """
-DIAGNOSTICO BASE
-Acciones: Constituir COPASST, matriz de peligros, capacitaciones
-Presupuesto: $1-3 millones COP
+        t = empresa_data.get('trabajadores', 0)
+        return f"""
+DIAGNOSTICO SST
+
+NIT: {empresa_data.get('nit', 'No')}
+Trabajadores: {t}
+ARL: {empresa_data.get('arl', 'No')}
+
+ACCIONES:
+1. Constituir COPASST
+2. Matriz de peligros GTC-45
+3. Capacitaciones SST (8 horas)
+
+PRESUPUESTO: ${t * 150000:,} COP
 """
     
     def responder_chat(self, pregunta: str, contexto: Dict) -> str:
-        prompt = f"Contexto: {contexto}\nPregunta: {pregunta}\nResponde como experto SST:"
-        respuesta = self.call_gemini(prompt)
+        respuesta = self.call_gemini(f"Pregunta SST: {pregunta}", "Eres experto SST")
         if respuesta:
             return respuesta
-        respuesta = self.call_groq(prompt)
+        respuesta = self.call_groq(f"Pregunta SST: {pregunta}")
         if respuesta:
             return respuesta
-        return "Puedo ayudarte con peligros, capacitaciones, incidentes o normativa SST."
+        return "IA no disponible. Ve a Test IA."
 
 ia_engine = IAEngine()
