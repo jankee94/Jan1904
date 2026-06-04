@@ -19,16 +19,32 @@ def call_gemini(prompt):
     if not key:
         return None
     try:
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
-        headers = {"Content-Type": "application/json", "x-goog-api-key": key}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
-        r = requests.post(url, json=data, headers=headers, timeout=30)
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": key
+        }
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        r = requests.post(url, json=payload, headers=headers, timeout=30)
         if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return None
-    except:
+            data = r.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            st.error(f"API error: {r.status_code} - {r.text[:200]}")
+            return None
+    except Exception as e:
+        st.error(f"Exception: {e}")
         return None
 
+# Login
 if not st.session_state.auth:
     st.title("SG-SST PHVA")
     col1, col2, col3 = st.columns([1,2,1])
@@ -44,8 +60,7 @@ if not st.session_state.auth:
 else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
-        st.markdown("### SG-SST PHVA")
-        opcion = st.radio("Menu", ["Diagnostico", "Chat", "Test IA"])
+        opcion = st.radio("Menú", ["Diagnóstico", "Chat", "Test IA"])
         if st.button("Salir"):
             st.session_state.auth = False
             st.rerun()
@@ -62,25 +77,25 @@ else:
                 if res:
                     st.success(f"Respuesta: {res}")
                 else:
-                    st.error("Gemini no responde - Puede ser key invalida o error de red")
-        st.info("Secrets configurado: GEMINI_API_KEY")
+                    st.error("Gemini no respondió (ver detalle arriba)")
+        st.info("Secrets configurado correctamente")
     
-    elif opcion == "Diagnostico":
-        st.title("Diagnostico IA")
+    elif opcion == "Diagnóstico":
+        st.title("Diagnóstico IA")
         with st.form("f"):
             nit = st.text_input("NIT")
             tra = st.number_input("Trabajadores", min_value=1, value=10)
             arl = st.selectbox("ARL", ["Positiva", "Sura", "Colpatria"])
-            if st.form_submit_button("Generar"):
+            if st.form_submit_button("Generar diagnóstico"):
                 with st.spinner("IA..."):
-                    prompt = f"NIT:{nit} Trabajadores:{tra} ARL:{arl}. Genera diagnostico SST completo."
+                    prompt = f"NIT:{nit} Trabajadores:{tra} ARL:{arl}. Genera diagnóstico SST completo."
                     res = call_gemini(prompt)
                     if res:
                         st.markdown(res)
                     else:
-                        st.error("IA no disponible")
+                        st.error("No se pudo obtener respuesta")
     
-    else:
+    else:  # Chat
         st.title("Chat IA")
         if "msgs" not in st.session_state:
             st.session_state.msgs = []
@@ -94,7 +109,7 @@ else:
                 st.markdown(p)
             r = call_gemini(p)
             if not r:
-                r = "IA no disponible"
+                r = "Lo siento, no pude procesar tu consulta."
             with st.chat_message("assistant"):
                 st.markdown(r)
             st.session_state.msgs.append({"r": "assistant", "c": r})
