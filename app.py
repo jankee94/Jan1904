@@ -36,7 +36,12 @@ else:
     with st.sidebar:
         st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=60)
         st.markdown("### SG-SST PHVA")
-        st.markdown(f"**Progreso:** {len(st.session_state.empresa) > 0 and 'Datos cargados' or 'Pendiente'}")
+        
+        if st.session_state.empresa.get("nombre"):
+            st.success(f"📌 {st.session_state.empresa.get('nombre')}")
+        else:
+            st.info("⚠️ Complete datos en Diagnostico IA")
+        
         st.markdown("---")
         
         menu = st.radio(
@@ -44,6 +49,7 @@ else:
             ["🏠 Dashboard", "🔍 Diagnostico IA", "🤖 Asistente IA", "⚠️ Peligros", "📋 Plan Anual"]
         )
         
+        st.markdown("---")
         if st.button("🚪 Cerrar Sesion"):
             st.session_state.authenticated = False
             st.rerun()
@@ -62,16 +68,57 @@ else:
         
         if not st.session_state.empresa.get("nombre"):
             st.info("🎯 Ve a 'Diagnostico IA' para comenzar")
-        else:
-            st.success("✅ Sistema listo - Usa el Asistente IA para consultas")
     
-    # Diagnostico IA
+    # Diagnostico IA - FORMULARIO COMPLETO
     elif menu == "🔍 Diagnostico IA":
-        diagnostic_ia.show()
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 2rem; border-radius: 20px; margin-bottom: 2rem;">
+            <h1 style="color: white; text-align: center;">🔍 Diagnostico con IA</h1>
+            <p style="color: white; text-align: center;">Ingresa los datos de tu empresa</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("empresa_form"):
+            st.markdown("### 📋 Datos de la empresa")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                nombre = st.text_input("🏢 Nombre de la empresa *", value=st.session_state.empresa.get("nombre", ""))
+                nit = st.text_input("📄 NIT", value=st.session_state.empresa.get("nit", ""))
+                ciudad = st.text_input("📍 Ciudad", value=st.session_state.empresa.get("ciudad", ""))
+            
+            with col2:
+                sector = st.selectbox("🏭 Sector economico *", ["Construccion", "Manufactura", "Servicios", "Mineria", "Salud", "Educacion", "Comercio"])
+                trabajadores = st.number_input("👥 Numero de trabajadores *", min_value=1, value=st.session_state.empresa.get("trabajadores", 10))
+                arl = st.selectbox("🛡️ ARL", ["Positiva", "Sura", "Colpatria", "Bolivar", "No aplica"])
+            
+            submitted = st.form_submit_button("🚀 Guardar y Generar Diagnostico", use_container_width=True, type="primary")
+        
+        if submitted and nombre.strip() and trabajadores >= 1:
+            st.session_state.empresa = {
+                "nombre": nombre,
+                "nit": nit,
+                "sector": sector,
+                "trabajadores": trabajadores,
+                "ciudad": ciudad,
+                "arl": arl
+            }
+            with st.spinner("🧠 IA analizando..."):
+                diagnostico = ia_engine.generar_diagnostico(st.session_state.empresa)
+                st.session_state.diagnostico_actual = diagnostico
+        
+        if st.session_state.get("diagnostico_actual"):
+            st.markdown("---")
+            st.markdown("### 📋 DIAGNOSTICO GENERADO")
+            st.markdown(st.session_state.diagnostico_actual)
+            st.download_button("📥 Descargar", st.session_state.diagnostico_actual, "diagnostico.txt")
     
     # Asistente IA
     elif menu == "🤖 Asistente IA":
         st.markdown("# 🤖 Asistente IA - Experto SST")
+        
+        if not st.session_state.empresa.get("nombre"):
+            st.warning("⚠️ Primero registra los datos de la empresa en Diagnostico IA")
         
         for msg in st.session_state.chat_messages:
             with st.chat_message(msg["role"]):
@@ -81,27 +128,20 @@ else:
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
-            
-            with st.spinner("IA analizando..."):
-                contexto = {
-                    "empresa": st.session_state.empresa.get("nombre", ""),
-                    "sector": st.session_state.empresa.get("sector", "")
-                }
+            with st.spinner("IA pensando..."):
+                contexto = {"empresa": st.session_state.empresa.get("nombre", ""), "sector": st.session_state.empresa.get("sector", "")}
                 respuesta = ia_engine.responder_chat(prompt, contexto)
-            
             with st.chat_message("assistant"):
                 st.markdown(respuesta)
             st.session_state.chat_messages.append({"role": "assistant", "content": respuesta})
     
-    # Peligros (placeholder)
     elif menu == "⚠️ Peligros":
         st.markdown("# ⚠️ Matriz de Peligros")
-        st.info("Modulo en desarrollo - Proximamente podras identificar y evaluar peligros")
+        st.info("Modulo en desarrollo - Proximamente")
     
-    # Plan Anual (placeholder)
     elif menu == "📋 Plan Anual":
         st.markdown("# 📅 Plan Anual SST")
-        st.info("Modulo en desarrollo - Proximamente tendras plan anual generado por IA")
+        st.info("Modulo en desarrollo - Proximamente")
 
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: gray;'>SG-SST PHVA - Sistema con IA para PYMES</p>", unsafe_allow_html=True)
