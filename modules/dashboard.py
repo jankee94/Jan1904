@@ -1,6 +1,13 @@
 ﻿import streamlit as st
+from core.db import db
 
-def render(db, ia):
+def render():
     st.title("📊 Dashboard")
-    peligros = db.fetch_all("SELECT * FROM peligros")
-    st.metric("Total Peligros", len(peligros))
+    
+    empresa = db.obtener_empresa()
+    if empresa:
+        st.metric("Empresa", empresa.get("nombre", "-"))
+        st.metric("Trabajadores", empresa.get("trabajadores", 0))
+    
+    st.metric("Peligros", len(db.obtener_peligros()))
+    st.metric("Acciones", len(db.obtener_acciones()))

@@ -1,28 +1,23 @@
 ﻿import streamlit as st
+from core.db import db
 
-def render(db, ia, auth_manager):
+def render():
     st.title("⚠️ Peligros")
     
-    with st.form("form"):
-        tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial"])
-        descripcion = st.text_area("Descripción")
-        ubicacion = st.text_input("Ubicación")
-        prob = st.slider("Probabilidad", 1, 4, 2)
-        sev = st.slider("Severidad", 1, 3, 2)
-        
-        matriz = {(1,1):"III",(1,2):"II",(1,3):"I",(2,1):"III",(2,2):"II",(2,3):"I",
-                  (3,1):"II",(3,2):"I",(3,3):"I",(4,1):"II",(4,2):"I",(4,3):"I"}
-        nivel = matriz.get((prob, sev), "III")
-        st.info(f"Nivel: {nivel}")
-        
-        if st.form_submit_button("Guardar"):
-            db.execute_query('''
-                INSERT INTO peligros (tipo, descripcion, ubicacion, probabilidad, severidad, nivel_riesgo)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (tipo, descripcion, ubicacion, prob, sev, nivel))
-            st.success("Guardado")
-            st.rerun()
+    tab1, tab2 = st.tabs(["Lista", "Nuevo"])
     
-    df = db.fetch_all("SELECT * FROM peligros")
-    if not df.empty:
-        st.dataframe(df)
+    with tab1:
+        df = db.obtener_peligros()
+        if not df.empty:
+            st.dataframe(df)
+    
+    with tab2:
+        with st.form("form"):
+            tipo = st.selectbox("Tipo", ["Fisico", "Quimico", "Biologico", "Ergonomico", "Psicosocial"])
+            desc = st.text_area("Descripcion")
+            prob = st.slider("Probabilidad", 1, 4, 2)
+            sev = st.slider("Severidad", 1, 3, 2)
+            if st.form_submit_button("Guardar"):
+                db.guardar_peligro(tipo, desc, "", prob, sev, 0)
+                st.success("Guardado")
+                st.rerun()

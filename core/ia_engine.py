@@ -4,7 +4,6 @@ import itertools
 
 class IAEngine:
     def __init__(self):
-        # Cargar keys desde secrets
         self.gemini_keys = self._get_gemini_keys()
         self.groq_key = st.secrets.get("GROQ_API_KEY", "")
         self.gemini_cycle = itertools.cycle(self.gemini_keys) if self.gemini_keys else None
@@ -25,10 +24,8 @@ class IAEngine:
         return keys
     
     def call_gemini(self, prompt):
-        """Llama a Gemini con rotación de keys"""
         if not self.gemini_keys:
             return None
-        
         for _ in range(len(self.gemini_keys)):
             key = next(self.gemini_cycle)
             try:
@@ -43,20 +40,12 @@ class IAEngine:
         return None
     
     def call_groq(self, prompt):
-        """Llama a Groq API"""
         if not self.groq_key:
             return None
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {self.groq_key}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7
-            }
+            headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
+            data = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7}
             r = requests.post(url, json=data, headers=headers, timeout=30)
             if r.status_code == 200:
                 return r.json()["choices"][0]["message"]["content"]
@@ -65,7 +54,6 @@ class IAEngine:
         return None
     
     def call_best(self, prompt):
-        """Intenta Gemini primero, si falla usa Groq"""
         respuesta = self.call_gemini(prompt)
         if respuesta:
             return respuesta
@@ -74,5 +62,4 @@ class IAEngine:
             return respuesta
         return None
 
-# Instancia global
 ia = IAEngine()

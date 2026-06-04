@@ -1,17 +1,22 @@
 ﻿import streamlit as st
+from core.db import db
 
-def render(db, auth_manager):
+def render():
     st.title("👥 Trabajadores")
     
-    with st.form("form"):
-        nombre = st.text_input("Nombre")
-        cedula = st.text_input("Cédula")
-        if st.form_submit_button("Guardar"):
-            if nombre:
-                db.execute_query("INSERT INTO trabajadores (nombre, cedula) VALUES (?, ?)", (nombre, cedula))
+    tab1, tab2 = st.tabs(["Lista", "Nuevo"])
+    
+    with tab1:
+        df = db.obtener_trabajadores()
+        if not df.empty:
+            st.dataframe(df)
+    
+    with tab2:
+        with st.form("form"):
+            cedula = st.text_input("Cedula")
+            nombre = st.text_input("Nombre")
+            cargo = st.text_input("Cargo")
+            if st.form_submit_button("Guardar"):
+                db.guardar_trabajador(cedula, nombre, "", cargo, "")
                 st.success("Guardado")
                 st.rerun()
-    
-    df = db.fetch_all("SELECT * FROM trabajadores")
-    if not df.empty:
-        st.dataframe(df)

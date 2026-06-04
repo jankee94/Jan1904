@@ -1,17 +1,18 @@
 ﻿import streamlit as st
+from core.ia_engine import ia
 
-def render(db, ia, auth_manager):
-    st.title("🤖 Chat IA")
+def render():
+    st.title("💬 Chat")
     
-    if "msg" not in st.session_state:
-        st.session_state.msg = []
+    if "msgs" not in st.session_state:
+        st.session_state.msgs = []
     
-    for m in st.session_state.msg:
-        with st.chat_message(m["rol"]):
-            st.markdown(m["contenido"])
+    for msg in st.session_state.msgs:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
     
-    if p := st.chat_input("Pregunta:"):
-        st.session_state.msg.append({"rol": "user", "contenido": p})
-        r = ia.call_gemini(p)
-        st.session_state.msg.append({"rol": "assistant", "contenido": r})
+    if prompt := st.chat_input("Pregunta..."):
+        st.session_state.msgs.append({"role": "user", "content": prompt})
+        respuesta = ia.call_best(prompt)
+        st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
         st.rerun()
