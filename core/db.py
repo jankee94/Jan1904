@@ -1,121 +1,92 @@
-﻿import sqlite3
-import pandas as pd
+﻿# core/db.py
+import streamlit as st
+import firebase_admin
+from firebase_admin import firestore, credentials
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from config.settings import settings
 
-class Database:
+class FirestoreDB:
+    """Gestor de base de datos Firestore"""
+    
     def __init__(self):
-        self.conn = sqlite3.connect("sst.db", check_same_thread=False)
-        self._init_tables()
+        self.db = self.init_firestore()
     
-    def _init_tables(self):
-        cursor = self.conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS empresa (
-                id INTEGER PRIMARY KEY DEFAULT 1,
-                nombre TEXT,
-                trabajadores INTEGER,
-                arl TEXT,
-                diagnostico TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS peligros (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tipo TEXT,
-                descripcion TEXT,
-                probabilidad INTEGER,
-                severidad INTEGER,
-                nivel TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS acciones (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                descripcion TEXT,
-                responsable TEXT,
-                fecha TEXT,
-                estado TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS trabajadores (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT,
-                cedula TEXT,
-                cargo TEXT
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS incidentes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                descripcion TEXT,
-                fecha TEXT,
-                gravedad TEXT
-            )
-        ''')
-        
-        self.conn.commit()
+    def init_firestore(self):
+        """Inicializar Firestore"""
+        if not firebase_admin._apps:
+            try:
+                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+                firebase_admin.initialize_app(cred)
+            except Exception as e:
+                st.error(f"Error Firebase: {e}")
+                return None
+        return firestore.client()
     
-    def guardar_empresa(self, nombre, trabajadores, arl, diagnostico):
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM empresa")
-        cursor.execute("INSERT INTO empresa (nombre, trabajadores, arl, diagnostico) VALUES (?, ?, ?, ?)",
-                      (nombre, trabajadores, arl, diagnostico))
-        self.conn.commit()
+    def get_collection(self, name: str):
+        """Obtener referencia a colección"""
+        if not self.db:
+            return None
+        return self.db.collection(name)
     
-    def obtener_empresa(self):
-        df = pd.read_sql_query("SELECT * FROM empresa", self.conn)
-        return df.iloc[0].to_dict() if not df.empty else None
+    def create_document(self, collection: str, data: Dict[str, Any]) -> Optional[str]:
+        """Crear documento y devolver ID"""
+        try:
+            data["created_at"] = datetime.now()
+            data["updated_at"] = datetime.now()
+            
+            doc_ref = self.db.collection(collection).add(data)
+            return doc_ref[1].id
+        except Exception as e:
+            st.error(f"Error crear documento: {e}")
+            return None
     
-    def guardar_peligro(self, tipo, desc, prob, sev):
-        matriz = {(1,1):"III",(1,2):"II",(1,3):"I",(2,1):"III",(2,2):"II",(2,3):"I",
-                  (3,1):"II",(3,2):"I",(3,3):"I",(4,1):"II",(4,2):"I",(4,3):"I"}
-        nivel = matriz.get((prob, sev), "III")
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO peligros (tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?)",
-                      (tipo, desc, prob, sev, nivel))
-        self.conn.commit()
+    def get_document(self, collection: str, doc_id: str) -> Optional[Dict]:
+        """Obtener documento por ID"""
+        try:
+            doc = self.db.collection(collection).document(doc_id).get()
+            if doc.exists:
+                return {"id": doc.id, **doc.to_dict()}
+            return None
+        except Exception as e:
+            st.error(f"Error obtener documento: {e}")
+            return None
     
-    def obtener_peligros(self):
-        return pd.read_sql_query("SELECT * FROM peligros", self.conn)
+    def get_all(self, collection: str, filters: List = None, limit: int = None) -> List[Dict]:
+        """Obtener todos los documentos con filtros"""
+        try:
+            query = self.db.collection(collection)
+            
+            if filters:
+                for field, op, value in filters:
+                    query = query.where(field, op, value)
+            
+            if limit:
+                query = query.limit(limit)
+            
+            docs = query.stream()
+            return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+        except Exception as e:
+            st.error(f"Error obtener documentos: {e}")
+            return []
     
-    def eliminar_peligro(self, id):
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM peligros WHERE id = ?", (id,))
-        self.conn.commit()
+    def update_document(self, collection: str, doc_id: str, data: Dict[str, Any]) -> bool:
+        """Actualizar documento"""
+        try:
+            data["updated_at"] = datetime.now()
+            self.db.collection(collection).document(doc_id).update(data)
+            return True
+        except Exception as e:
+            st.error(f"Error actualizar: {e}")
+            return False
     
-    def guardar_accion(self, desc, responsable, fecha):
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO acciones (descripcion, responsable, fecha, estado) VALUES (?, ?, ?, 'Pendiente')",
-                      (desc, responsable, fecha))
-        self.conn.commit()
-    
-    def obtener_acciones(self):
-        return pd.read_sql_query("SELECT * FROM acciones", self.conn)
-    
-    def actualizar_estado(self, id, estado):
-        cursor = self.conn.cursor()
-        cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (estado, id))
-        self.conn.commit()
-    
-    def guardar_trabajador(self, nombre, cedula, cargo):
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO trabajadores (nombre, cedula, cargo) VALUES (?, ?, ?)", (nombre, cedula, cargo))
-        self.conn.commit()
-    
-    def obtener_trabajadores(self):
-        return pd.read_sql_query("SELECT * FROM trabajadores", self.conn)
-    
-    def guardar_incidente(self, desc, fecha, gravedad):
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO incidentes (descripcion, fecha, gravedad) VALUES (?, ?, ?)", (desc, fecha, gravedad))
-        self.conn.commit()
-    
-    def obtener_incidentes(self):
-        return pd.read_sql_query("SELECT * FROM incidentes", self.conn)
+    def delete_document(self, collection: str, doc_id: str) -> bool:
+        """Eliminar documento (soft delete)"""
+        try:
+            self.update_document(collection, doc_id, {"estado": "inactivo"})
+            return True
+        except Exception as e:
+            st.error(f"Error eliminar: {e}")
+            return False
 
-db = Database()
+db = FirestoreDB()
