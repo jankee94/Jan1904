@@ -8,10 +8,10 @@ from datetime import datetime
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="centered")
 
-# CSS para forzar centrado absoluto
+# CSS con distribución corregida
 st.markdown("""
 <style>
-    /* Eliminar TODO el padding de Streamlit */
+    /* Eliminar padding de Streamlit */
     .main > div {
         padding: 0 !important;
         margin: 0 !important;
@@ -20,13 +20,11 @@ st.markdown("""
         padding: 0 !important;
         margin: 0 !important;
         max-width: 100% !important;
-        position: relative !important;
-        top: 0 !important;
     }
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
     }
-    /* Centrado absoluto con position fixed */
+    /* Centrado absoluto */
     .login-wrapper {
         position: fixed;
         top: 0;
@@ -39,105 +37,126 @@ st.markdown("""
         z-index: 999;
     }
     .login-card {
-        background: rgba(20, 20, 40, 0.75);
+        background: rgba(20, 20, 40, 0.85);
         backdrop-filter: blur(15px);
-        border-radius: 32px;
-        padding: 40px 35px;
-        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 28px;
+        padding: 30px 35px;
+        border: 1px solid rgba(255,255,255,0.12);
         box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         width: 380px;
         text-align: center;
-        animation: fadeIn 0.6s ease-out;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
     }
     .logo-img {
-        width: 70px;
+        width: 65px;
         display: block;
-        margin: 0 auto 15px auto;
+        margin: 0 auto 12px auto;
     }
     .app-title {
-        font-size: 26px;
-        font-weight: 800;
-        background: linear-gradient(135deg, #fff, #a8c0ff, #667eea);
+        font-size: 24px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #ffffff, #a8c0ff, #667eea);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0 0 5px 0;
     }
     .app-slogan {
         font-size: 12px;
-        color: rgba(255,255,255,0.65);
+        color: rgba(255,255,255,0.6);
         margin-bottom: 25px;
         font-style: italic;
+    }
+    /* Inputs con espacio adecuado */
+    .stTextInput {
+        margin-bottom: 18px !important;
     }
     .stTextInput > div > div > input {
         background: rgba(255,255,255,0.08) !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         color: white !important;
-        padding: 12px 15px !important;
+        padding: 10px 14px !important;
         font-size: 14px !important;
     }
     .stTextInput > div > div > input:focus {
         border-color: #667eea !important;
-        box-shadow: 0 0 0 3px rgba(102,126,234,0.2) !important;
+        box-shadow: 0 0 0 2px rgba(102,126,234,0.25) !important;
     }
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        border: none !important;
-        border-radius: 14px !important;
-        padding: 12px !important;
-        font-weight: 600 !important;
-        font-size: 15px !important;
-        width: 100% !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(102,126,234,0.4);
-    }
-    .forgot-link {
-        text-align: center;
-        margin-top: 20px;
-    }
-    .forgot-link button {
-        background: transparent !important;
-        color: rgba(255,255,255,0.6) !important;
-        font-size: 12px !important;
-        box-shadow: none !important;
-    }
-    .forgot-link button:hover {
-        color: #a8c0ff !important;
-        transform: none !important;
-    }
-    .footer {
-        text-align: center;
-        margin-top: 25px;
-        font-size: 10px;
-        color: rgba(255,255,255,0.35);
-    }
-    hr {
-        margin: 20px 0;
-        border-color: rgba(255,255,255,0.1);
-    }
-    .success-msg {
-        background: rgba(0,255,0,0.1);
-        border: 1px solid rgba(0,255,0,0.3);
-        border-radius: 12px;
-        padding: 10px;
-        text-align: center;
-        color: #00ff88;
-        font-size: 13px;
-    }
+    /* Labels */
     label {
         color: rgba(255,255,255,0.8) !important;
         font-size: 13px !important;
+        font-weight: 500 !important;
         text-align: left !important;
         display: block !important;
         margin-bottom: 5px !important;
     }
-    /* Ocultar header de Streamlit */
+    /* Botón */
+    .stButton {
+        margin-top: 8px !important;
+        margin-bottom: 20px !important;
+    }
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 10px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        width: 100% !important;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(102,126,234,0.35);
+    }
+    /* Link olvidó contraseña */
+    .forgot-link {
+        text-align: center;
+        margin: 15px 0 20px 0;
+    }
+    .forgot-link button {
+        background: transparent !important;
+        color: rgba(255,255,255,0.55) !important;
+        font-size: 12px !important;
+        padding: 5px !important;
+        box-shadow: none !important;
+    }
+    .forgot-link button:hover {
+        color: #a8c0ff !important;
+        background: transparent !important;
+    }
+    /* Footer */
+    .footer {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+    }
+    /* Mensajes */
+    .stAlert {
+        background: rgba(255,0,0,0.15) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 8px !important;
+        font-size: 12px !important;
+        margin-top: 10px !important;
+    }
+    .success-msg {
+        background: rgba(0,255,100,0.1);
+        border: 1px solid rgba(0,255,100,0.25);
+        border-radius: 12px;
+        padding: 10px;
+        text-align: center;
+        color: #00ff88;
+        font-size: 12px;
+        margin-bottom: 15px;
+    }
+    hr {
+        margin: 15px 0;
+        border-color: rgba(255,255,255,0.08);
+    }
     header {
         display: none !important;
     }
@@ -253,7 +272,7 @@ if "empresa_actual_id" not in st.session_state:
 if "empresa_actual" not in st.session_state:
     st.session_state.empresa_actual = None
 
-# ========== LOGIN CENTRADO ABSOLUTO ==========
+# ========== LOGIN ==========
 if not st.session_state.auth:
     st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
     
@@ -265,9 +284,9 @@ if not st.session_state.auth:
             <div class="app-slogan">✨ Seguridad y Salud, compromiso de todos ✨</div>
         """, unsafe_allow_html=True)
         
-        with st.form("login_form"):
-            username = st.text_input("Usuario", placeholder="Ingrese su usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingrese su contraseña")
+        with st.form("login_form", clear_on_submit=False):
+            username = st.text_input("📌 Usuario", placeholder="Ingrese su usuario")
+            password = st.text_input("🔒 Contraseña", type="password", placeholder="Ingrese su contraseña")
             
             if st.form_submit_button("🚀 INGRESAR", use_container_width=True):
                 user = verificar_login(username, password)
@@ -284,7 +303,6 @@ if not st.session_state.auth:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('<hr>', unsafe_allow_html=True)
         st.markdown('<div class="footer">🛡️ SG-SST PHVA | Desarrollado por JAN BENITEZ</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -296,9 +314,9 @@ if not st.session_state.auth:
             <div class="app-slogan">✨ Te enviaremos una nueva contraseña ✨</div>
         """, unsafe_allow_html=True)
         
-        with st.form("reset_form"):
-            username = st.text_input("Usuario", placeholder="Ingrese su usuario")
-            email = st.text_input("Email", placeholder="Ingrese su email registrado")
+        with st.form("reset_form", clear_on_submit=False):
+            username = st.text_input("📌 Usuario", placeholder="Ingrese su usuario")
+            email = st.text_input("✉️ Email", placeholder="Ingrese su email registrado")
             
             if st.form_submit_button("📧 ENVIAR NUEVA CONTRASEÑA", use_container_width=True):
                 success, new_pass = reset_password(username, email)
