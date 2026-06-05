@@ -6,6 +6,104 @@ import requests
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
+# ========== ESTILOS CSS PROFESIONAL ==========
+st.markdown("""
+<style>
+    /* Fondo gradiente corporativo */
+    .stApp {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+    
+    /* Tarjeta de login */
+    .login-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 40px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    /* Título principal */
+    .main-title {
+        text-align: center;
+        font-size: 42px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
+    }
+    
+    /* Subtítulo */
+    .subtitle {
+        text-align: center;
+        color: #666;
+        font-size: 16px;
+        margin-bottom: 30px;
+    }
+    
+    /* Logo */
+    .logo-container {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    /* Footer desarrollador */
+    .developer-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        z-index: 999;
+    }
+    
+    /* Botón personalizado */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 12px;
+        font-weight: bold;
+        font-size: 16px;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* Input fields */
+    .stTextInput > div > div > input {
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        padding: 10px 15px;
+    }
+    
+    /* Sidebar */
+    .css-1d391kg {
+        background: rgba(255,255,255,0.95);
+    }
+    
+    /* Cards en dashboard */
+    .metric-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ========== BASE DE DATOS ==========
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -131,47 +229,119 @@ if "auth" not in st.session_state:
 if "proceso_iniciado" not in st.session_state:
     st.session_state.proceso_iniciado = False
 
-# ========== LOGIN ==========
+# ========== LOGIN PROFESIONAL ==========
 if not st.session_state.auth:
-    st.title("🔐 SG-SST PHVA")
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
     with col2:
-        st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=100)
-        user = st.text_input("Usuario")
-        pwd = st.text_input("Contraseña", type="password")
-        if st.button("Ingresar"):
-            if user == "admin" and pwd == "sst2024":
-                st.session_state.auth = True
-                st.rerun()
-            else:
-                st.error("Usuario: admin / Contraseña: sst2024")
+        st.markdown("""
+        <div class="login-card">
+            <div class="logo-container">
+                <h1 class="main-title">🔄 SG-SST PHVA</h1>
+                <p class="subtitle">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            st.markdown("### 🔐 Acceso al Sistema")
+            user = st.text_input("👤 Usuario", placeholder="admin", key="login_user")
+            pwd = st.text_input("🔒 Contraseña", type="password", placeholder="••••••", key="login_pwd")
+            
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                submitted = st.form_submit_button("🚀 INGRESAR AL SISTEMA", use_container_width=True)
+            
+            if submitted:
+                if user == "admin" and pwd == "sst2024":
+                    st.session_state.auth = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciales incorrectas. Use: admin / sst2024")
+        
+        st.markdown("""
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                <p style="color: #666; font-size: 12px;">© 2024 - Todos los derechos reservados</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Footer visible en login
+    st.markdown("""
+    <div class="developer-footer">
+        🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ | IA Protagonista | Nivel DIOS
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.stop()
 
 # ========== BIENVENIDA ==========
 if not st.session_state.proceso_iniciado:
     st.title("🔄 BIENVENIDO AL SG-SST PHVA")
     st.markdown("---")
+    
     col1, col2 = st.columns([2,1])
     with col1:
         st.markdown("""
         ### 📋 ¿CÓMO FUNCIONA?
-        **Paso 1:** Completa el diagnóstico IA  
-        **Paso 2:** La IA generará diagnóstico y precargará datos  
-        **Paso 3:** Revisa y completa los módulos  
+        
+        **Paso 1:** Completa el diagnóstico IA con los datos de tu empresa  
+        **Paso 2:** La IA generará un diagnóstico completo  
+        **Paso 3:** Los datos se precargarán automáticamente en todos los módulos  
+        **Paso 4:** Revisa, completa y da seguimiento a cada fase del ciclo PHVA
+        
+        ### ✅ FASES DEL CICLO PHVA
+        
+        | Fase | Módulo | Estado |
+        |------|--------|--------|
+        | 1 | Diagnóstico IA | ⬜ Pendiente |
+        | 2 | Identificar Peligros (GTC-45) | ⬜ Pendiente |
+        | 3 | Evaluar Riesgos | ⬜ Pendiente |
+        | 4 | Plan de Acción | ⬜ Pendiente |
+        | 5 | Gestión de Trabajadores | ⬜ Pendiente |
+        | 6 | Registro de Incidentes | ⬜ Pendiente |
         """)
+    
     with col2:
-        if st.button("🎯 COMENZAR PROCESO"):
+        st.markdown("""
+        <div style='
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            border-radius: 20px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        '>
+            <h2 style="font-size: 48px; margin: 0;">🚀</h2>
+            <h3 style="margin: 10px 0;">¿LISTO PARA COMENZAR?</h3>
+            <p>Completa el diagnóstico y la IA hará el trabajo pesado por ti.</p>
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">Powered by Gemini AI</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🎯 COMENZAR PROCESO", use_container_width=True):
             st.session_state.proceso_iniciado = True
             st.rerun()
+    
+    st.markdown("---")
+    st.markdown("<center>DESARROLLADO POR JAN BENITEZ</center>", unsafe_allow_html=True)
     st.stop()
 
 # ========== SIDEBAR ==========
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=80)
+    st.markdown(f"**👤 {st.session_state.get('user', 'Administrador')}**")
+    st.markdown("---")
+    
     empresa = obtener_empresa()
     if empresa:
         st.markdown(f"**🏢 {empresa.get('nombre', 'Empresa')[:20]}**")
-    menu = st.radio("MENU", [
+        st.caption(f"📊 {empresa.get('trabajadores', 0)} trabajadores")
+    else:
+        st.info("Sin empresa registrada")
+    
+    st.markdown("---")
+    
+    menu = st.radio("📋 MENU", [
         "📊 Dashboard",
         "🤖 Diagnóstico IA",
         "⚠️ Peligros",
@@ -180,78 +350,80 @@ with st.sidebar:
         "📝 Incidentes",
         "💬 Chat IA"
     ])
-    if st.button("Salir"):
+    
+    st.markdown("---")
+    if st.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.auth = False
         st.session_state.proceso_iniciado = False
         st.rerun()
 
+# ========== RESTANTE DEL CÓDIGO (MÓDULOS) ==========
 empresa = obtener_empresa()
 
-# ========== DASHBOARD ==========
 if menu == "📊 Dashboard":
-    st.title("📊 Dashboard")
+    st.title("📊 Dashboard SST - Indicadores en Tiempo Real")
+    
     if empresa:
-        st.success(f"Empresa: {empresa.get('nombre', '')}")
+        st.success(f"🏢 **{empresa.get('nombre', '')}** | 👥 {empresa.get('trabajadores', 0)} trabajadores")
+    
     col1, col2, col3 = st.columns(3)
+    peligros = obtener_peligros()
+    acciones = obtener_acciones()
+    trabajadores = obtener_trabajadores()
+    
     with col1:
-        st.metric("Peligros", len(obtener_peligros()))
+        st.metric("⚠️ Peligros", len(peligros))
     with col2:
-        st.metric("Acciones", len(obtener_acciones()))
+        completadas = len(acciones[acciones['estado'] == 'Completada']) if not acciones.empty else 0
+        st.metric("✅ Acciones", f"{completadas}/{len(acciones)}")
     with col3:
-        st.metric("Trabajadores", len(obtener_trabajadores()))
+        st.metric("👥 Trabajadores", len(trabajadores))
+    
     st.markdown("---")
     st.caption("DESARROLLADO POR JAN BENITEZ")
 
-# ========== DIAGNÓSTICO IA ==========
 elif menu == "🤖 Diagnóstico IA":
-    st.title("🤖 DIAGNÓSTICO IA")
+    st.title("🤖 DIAGNÓSTICO IA - FASE 1")
     
     if empresa:
         st.success(f"✅ Empresa: {empresa.get('nombre', '')}")
-        with st.expander("Ver diagnóstico"):
+        with st.expander("📋 Ver diagnóstico completo"):
             st.write(empresa.get('diagnostico', ''))
         if st.button("⚠️ Ir a Peligros"):
             st.session_state.menu = "⚠️ Peligros"
             st.rerun()
     else:
         with st.form("form_diagnostico"):
-            nombre = st.text_input("Nombre de la empresa")
-            trabajadores = st.number_input("Trabajadores", min_value=1, value=10)
-            arl = st.selectbox("ARL", ["Positiva", "Sura", "Colpatria"])
-            if st.form_submit_button("Generar Diagnóstico"):
+            nombre = st.text_input("📛 Nombre de la empresa *")
+            trabajadores = st.number_input("👥 Número de trabajadores *", min_value=1, value=10)
+            arl = st.selectbox("🏥 ARL *", ["Positiva", "Sura", "Colpatria"])
+            if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO"):
                 if nombre:
-                    with st.spinner("IA generando..."):
-                        prompt = f"Diagnóstico SST para {nombre} con {trabajadores} trabajadores. Máximo 200 palabras."
+                    with st.spinner("🤖 IA generando diagnóstico..."):
+                        prompt = f"Diagnóstico SST profesional para {nombre} con {trabajadores} trabajadores, ARL {arl}. Incluye peligros, riesgos y plan de acción."
                         respuesta = call_ia(prompt)
                         if respuesta and "Error" not in respuesta:
                             guardar_empresa(nombre, trabajadores, arl, respuesta)
-                            # Precargar peligros
-                            guardar_peligro("Ergonómico", f"Posturas en {nombre}", 2, 2)
+                            guardar_peligro("Ergonómico", f"Posturas inadecuadas en {nombre}", 2, 2)
                             guardar_peligro("Seguridad", "Caídas al mismo nivel", 2, 2)
                             guardar_peligro("Psicosocial", "Estrés laboral", 2, 2)
-                            # Precargar acciones
                             fecha = datetime.now()
                             guardar_accion(f"Matriz de riesgos para {nombre}", "SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d"))
-                            guardar_accion("Capacitar al personal", "Coordinador", (fecha + timedelta(days=45)).strftime("%Y-%m-%d"))
+                            guardar_accion("Capacitación en prevención", "Coordinador", (fecha + timedelta(days=45)).strftime("%Y-%m-%d"))
                             st.balloons()
                             st.success("✅ Diagnóstico generado y datos precargados")
                             st.rerun()
                         else:
-                            st.error("Error con IA. Usando modo offline.")
+                            st.error("Error con IA. Verifica conexión.")
 
-# ========== PELIGROS ==========
+# MÓDULOS RESTANTES (Peligros, Acciones, Trabajadores, Incidentes, Chat IA)
 elif menu == "⚠️ Peligros":
-    st.title("⚠️ Peligros")
-    tab1, tab2 = st.tabs(["Lista", "Nuevo"])
+    st.title("⚠️ PELIGROS - FASE 2 (GTC-45)")
+    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
     with tab1:
         df = obtener_peligros()
         if not df.empty:
             st.dataframe(df)
-            with st.expander("Eliminar"):
-                id_elim = st.number_input("ID", min_value=1, step=1)
-                if st.button("Eliminar"):
-                    eliminar_peligro(id_elim)
-                    st.rerun()
     with tab2:
         with st.form("form"):
             tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
@@ -263,38 +435,32 @@ elif menu == "⚠️ Peligros":
                     guardar_peligro(tipo, desc, prob, sev)
                     st.rerun()
 
-# ========== PLAN DE ACCIÓN ==========
 elif menu == "✅ Plan de Acción":
-    st.title("✅ Plan de Acción")
-    tab1, tab2 = st.tabs(["Seguimiento", "Nueva"])
+    st.title("✅ PLAN DE ACCIÓN - FASE 4")
+    tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva"])
     with tab1:
         df = obtener_acciones()
         for _, row in df.iterrows():
             col1, col2 = st.columns([3,1])
-            with col1:
-                st.write(f"**{row['descripcion']}** - {row['responsable']}")
-            with col2:
-                nuevo = st.selectbox("Estado", ["Pendiente", "Completada"], key=row['id'])
-                if nuevo != row['estado']:
-                    actualizar_estado(row['id'], nuevo)
-                    st.rerun()
+            st.write(f"**{row['descripcion']}** - {row['responsable']}")
+            nuevo = st.selectbox("Estado", ["Pendiente", "Completada"], key=row['id'])
+            if nuevo != row['estado']:
+                actualizar_estado(row['id'], nuevo)
+                st.rerun()
     with tab2:
         with st.form("form"):
             desc = st.text_area("Descripción")
             resp = st.text_input("Responsable")
-            fecha = st.date_input("Fecha límite", datetime.now())
             if st.form_submit_button("Guardar"):
                 if desc:
-                    guardar_accion(desc, resp, fecha.strftime("%Y-%m-%d"))
+                    guardar_accion(desc, resp, datetime.now().strftime("%Y-%m-%d"))
                     st.rerun()
 
-# ========== TRABAJADORES ==========
 elif menu == "👥 Trabajadores":
-    st.title("👥 Trabajadores")
-    tab1, tab2 = st.tabs(["Lista", "Nuevo"])
+    st.title("👥 TRABAJADORES - FASE 5")
+    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
     with tab1:
-        df = obtener_trabajadores()
-        st.dataframe(df)
+        st.dataframe(obtener_trabajadores())
     with tab2:
         with st.form("form"):
             nombre = st.text_input("Nombre")
@@ -305,9 +471,8 @@ elif menu == "👥 Trabajadores":
                     guardar_trabajador(nombre, cedula, cargo)
                     st.rerun()
 
-# ========== INCIDENTES ==========
 elif menu == "📝 Incidentes":
-    st.title("📝 Incidentes")
+    st.title("📝 INCIDENTES - FASE 6")
     with st.form("form"):
         desc = st.text_area("Descripción")
         fecha = st.date_input("Fecha", datetime.now())
@@ -316,12 +481,10 @@ elif menu == "📝 Incidentes":
             if desc:
                 guardar_incidente(desc, fecha.strftime("%Y-%m-%d"), gravedad)
                 st.rerun()
-    df = obtener_incidentes()
-    st.dataframe(df)
+    st.dataframe(obtener_incidentes())
 
-# ========== CHAT IA ==========
 elif menu == "💬 Chat IA":
-    st.title("💬 Chat IA")
+    st.title("💬 CHAT EXPERTO EN SST")
     if "msgs" not in st.session_state:
         st.session_state.msgs = []
     for msg in st.session_state.msgs:
@@ -333,5 +496,22 @@ elif menu == "💬 Chat IA":
         st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
         st.rerun()
 
-st.markdown("---")
-st.markdown("<center>DESARROLLADO POR JAN BENITEZ</center>", unsafe_allow_html=True)
+# ========== FOOTER GLOBAL ==========
+st.markdown("""
+<div style='
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-align: center;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    z-index: 999;
+'>
+    🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ | IA Protagonista | Nivel DIOS
+</div>
+""", unsafe_allow_html=True)
