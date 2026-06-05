@@ -3,6 +3,9 @@ from datetime import datetime, timedelta
 import sqlite3
 import pandas as pd
 import requests
+import base64
+from PIL import Image
+import io
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -17,6 +20,16 @@ st.markdown("""
         border-radius: 20px;
         padding: 40px;
         box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        text-align: center;
+    }
+    .logo-container {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .logo-img {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto;
     }
     .developer-footer {
         position: fixed;
@@ -38,6 +51,24 @@ st.markdown("""
         border-radius: 10px;
         padding: 12px;
         font-weight: bold;
+        width: 100%;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    .main-title {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 10px 0;
+    }
+    .subtitle {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 30px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -152,10 +183,6 @@ def obtener_diagnostico_por_id(id):
     df = pd.read_sql_query("SELECT * FROM empresa WHERE id = ?", conn, params=(id,))
     return df.iloc[0].to_dict() if not df.empty else None
 
-def obtener_empresa_actual():
-    df = pd.read_sql_query("SELECT * FROM empresa ORDER BY id DESC LIMIT 1", conn)
-    return df.iloc[0].to_dict() if not df.empty else None
-
 def set_empresa_actual(id):
     st.session_state.empresa_actual_id = id
     st.session_state.empresa_actual = obtener_diagnostico_por_id(id)
@@ -184,13 +211,20 @@ if "empresa_actual_id" not in st.session_state:
 if "empresa_actual" not in st.session_state:
     st.session_state.empresa_actual = None
 
-# ========== LOGIN ==========
+# ========== LOGIN CON LOGO ==========
 if not st.session_state.auth:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown('<h1 style="text-align:center;">🔄 SG-SST PHVA</h1>', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center;">Sistema de Gestión de Seguridad y Salud</p>', unsafe_allow_html=True)
+        
+        # LOGO PRINCIPAL
+        st.markdown("""
+        <div class="logo-container">
+            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img" style="width: 80px;">
+            <h1 class="main-title">🔄 SG-SST PHVA</h1>
+            <p class="subtitle">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         with st.form("login_form"):
             username = st.text_input("👤 Usuario", placeholder="Ingrese su usuario")
@@ -201,7 +235,7 @@ if not st.session_state.auth:
                 submitted = st.form_submit_button("🚀 INGRESAR", use_container_width=True)
             with col2:
                 if st.form_submit_button("❓ Olvidó su clave", use_container_width=True):
-                    st.info("Contacte al administrador para recuperar su contraseña.")
+                    st.info("📧 Contacte al administrador para recuperar su contraseña.")
             
             if submitted:
                 user = verificar_login(username, password)
@@ -228,7 +262,7 @@ with st.sidebar:
     if st.session_state.user['rol'] == 'admin':
         diagnosticos = obtener_diagnosticos()
         if not diagnosticos.empty:
-            empresas_opciones = diagnosticos.apply(lambda x: f"{x['id']} - {x['nombre']} ({x['nit']})", axis=1).tolist()
+            empresas_opciones = diagnosticos.apply(lambda x: f"{x['id']} - {x['nombre']} ({x['nit'] if x['nit'] else 'Sin NIT'})", axis=1).tolist()
             empresa_seleccionada = st.selectbox("🏢 Seleccionar empresa", ["-- Nueva empresa --"] + empresas_opciones)
             
             if empresa_seleccionada != "-- Nueva empresa --":
@@ -260,13 +294,15 @@ with st.sidebar:
         menu = st.radio("📋 MENU", [
             "📊 Dashboard",
             "📝 Reportar Incidente",
-            "📚 Mis Capacitaciones",
             "💬 Chat IA"
         ])
     
-    if st.button("🚪 Cerrar Sesión"):
+    st.markdown("---")
+    if st.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.auth = False
         st.session_state.user = None
+        st.session_state.empresa_actual = None
+        st.session_state.empresa_actual_id = None
         st.rerun()
 
 # ========== DASHBOARD ==========
@@ -275,15 +311,15 @@ if menu == "📊 Dashboard":
     
     if st.session_state.empresa_actual:
         emp = st.session_state.empresa_actual
-        st.success(f"🏢 **{emp.get('nombre', '')}** | NIT: {emp.get('nit', '')} | 👥 {emp.get('trabajadores', 0)} trabajadores")
+        st.success(f"🏢 **{emp.get('nombre', '')}** | NIT: {emp.get('nit', 'No registrado')} | 👥 {emp.get('trabajadores', 0)} trabajadores")
         
-        # Obtener datos de la empresa actual
         empresa_id = st.session_state.empresa_actual_id
         df_peligros = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(empresa_id,))
         df_acciones = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(empresa_id,))
         df_trabajadores = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(empresa_id,))
+        df_incidentes = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(empresa_id,))
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("⚠️ Peligros", len(df_peligros))
         with col2:
@@ -291,6 +327,8 @@ if menu == "📊 Dashboard":
             st.metric("✅ Acciones", f"{completadas}/{len(df_acciones)}")
         with col3:
             st.metric("👥 Trabajadores", len(df_trabajadores))
+        with col4:
+            st.metric("📝 Incidentes", len(df_incidentes))
     else:
         st.warning("⚠️ Seleccione o cree una empresa en 'Diagnóstico IA'")
 
@@ -303,47 +341,63 @@ elif menu == "🤖 Diagnóstico IA":
         st.subheader("📝 Datos de la empresa")
         col1, col2 = st.columns(2)
         with col1:
-            nit = st.text_input("NIT", placeholder="900.123.456-7")
+            nit = st.text_input("NIT (opcional)", placeholder="900.123.456-7")
             nombre = st.text_input("Nombre de la empresa *", placeholder="Mi Empresa S.A.S.")
         with col2:
             trabajadores = st.number_input("Número de trabajadores *", min_value=1, value=10)
             arl = st.selectbox("ARL *", ["Positiva", "Sura", "Colpatria", "Bolivar"])
         
-        if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO"):
+        if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO", use_container_width=True):
             if nombre:
                 with st.spinner("🤖 IA generando diagnóstico..."):
-                    prompt = f"Diagnóstico SST profesional para {nombre} con {trabajadores} trabajadores, ARL {arl}. Incluye peligros, riesgos y plan de acción."
+                    prompt = f"Diagnóstico SST profesional para {nombre} con {trabajadores} trabajadores, ARL {arl}. Incluye peligros, riesgos y plan de acción. Máximo 300 palabras."
                     respuesta = call_ia(prompt)
                     if respuesta and "Error" not in respuesta:
                         empresa_id = guardar_diagnostico(nit, nombre, trabajadores, arl, respuesta)
                         set_empresa_actual(empresa_id)
                         
-                        # Guardar peligros
+                        # Guardar peligros base
                         peligros_base = [
                             ("Ergonómico", f"Posturas inadecuadas en {nombre}", 2, 2),
                             ("Seguridad", "Caídas al mismo nivel", 2, 2),
                             ("Psicosocial", "Estrés laboral", 2, 2),
+                            ("Físico", "Iluminación inadecuada", 2, 1),
+                            ("Biológico", "Exposición a virus", 2, 2),
                         ]
                         for p in peligros_base:
-                            cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad) VALUES (?, ?, ?, ?, ?)",
-                                          (empresa_id, p[0], p[1], p[2], p[3]))
+                            nivel_calc = "III"
+                            cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?, ?)",
+                                          (empresa_id, p[0], p[1], p[2], p[3], nivel_calc))
                         
-                        # Guardar acciones
+                        # Guardar acciones base
                         fecha = datetime.now()
                         acciones_base = [
-                            (f"Matriz de riesgos para {nombre}", "SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d")),
-                            ("Capacitación en prevención", "Coordinador", (fecha + timedelta(days=45)).strftime("%Y-%m-%d")),
+                            (f"Realizar matriz de riesgos GTC-45 para {nombre}", "Responsable SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d")),
+                            ("Capacitar al personal en prevención de riesgos", "Coordinador SST", (fecha + timedelta(days=45)).strftime("%Y-%m-%d")),
+                            ("Implementar pausas activas diarias", "Líder de área", (fecha + timedelta(days=15)).strftime("%Y-%m-%d")),
                         ]
                         for a in acciones_base:
-                            cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha) VALUES (?, ?, ?, ?)",
+                            cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, 'Pendiente')",
                                           (empresa_id, a[0], a[1], a[2]))
                         
                         conn.commit()
                         st.balloons()
                         st.success("✅ Diagnóstico generado exitosamente")
-                        st.rerun()
+                        st.info(f"📋 Se precargaron {len(peligros_base)} peligros y {len(acciones_base)} acciones")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("⚠️ IR A PELIGROS"):
+                                st.session_state.menu = "⚠️ Peligros"
+                                st.rerun()
+                        with col2:
+                            if st.button("✅ IR A PLAN DE ACCIÓN"):
+                                st.session_state.menu = "✅ Plan de Acción"
+                                st.rerun()
                     else:
-                        st.error("Error con IA")
+                        st.error("Error con IA. Verifique su conexión.")
+            else:
+                st.error("❌ El nombre de la empresa es obligatorio")
     
     # Historial de diagnósticos
     st.markdown("---")
@@ -353,15 +407,17 @@ elif menu == "🤖 Diagnóstico IA":
         for _, row in df_diagnosticos.iterrows():
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.write(f"**{row['nombre']}** - {row['nit']} - {row['trabajadores']} trabajadores")
-                st.caption(f"📅 {row['fecha']}")
+                st.write(f"**{row['nombre']}**")
+                st.caption(f"NIT: {row['nit'] if row['nit'] else 'No registrado'} | 👥 {row['trabajadores']} trabajadores | 📅 {row['fecha']}")
             with col2:
                 if st.button(f"Seleccionar", key=f"sel_{row['id']}"):
                     set_empresa_actual(row['id'])
                     st.rerun()
             st.markdown("---")
+    else:
+        st.info("No hay diagnósticos previos. Crea el primero.")
 
-# ========== GESTIONAR USUARIOS (SOLO ADMIN) ==========
+# ========== GESTIONAR USUARIOS ==========
 elif menu == "⚙️ Gestionar Usuarios" and st.session_state.user['rol'] == 'admin':
     st.title("⚙️ Gestión de Usuarios")
     
@@ -371,68 +427,95 @@ elif menu == "⚙️ Gestionar Usuarios" and st.session_state.user['rol'] == 'ad
         df_usuarios = obtener_usuarios()
         st.dataframe(df_usuarios, use_container_width=True)
         
-        with st.expander("Editar usuario"):
+        with st.expander("✏️ Editar usuario"):
             usuario_id = st.number_input("ID del usuario", min_value=1, step=1)
-            nuevo_rol = st.selectbox("Nuevo rol", ["admin", "responsable_sst", "supervisor", "trabajador", "auditor"])
+            nuevo_rol = st.selectbox("Nuevo rol", ["trabajador", "supervisor", "responsable_sst", "auditor", "admin"])
             if st.button("Actualizar rol"):
                 actualizar_usuario(usuario_id, rol=nuevo_rol)
+                st.success("Rol actualizado")
                 st.rerun()
     
     with tab2:
         with st.form("form_usuario"):
-            username = st.text_input("Usuario")
-            password = st.text_input("Contraseña", type="password")
-            nombre = st.text_input("Nombre completo")
+            username = st.text_input("Usuario *")
+            password = st.text_input("Contraseña *", type="password")
+            nombre = st.text_input("Nombre completo *")
             rol = st.selectbox("Rol", ["trabajador", "supervisor", "responsable_sst", "auditor", "admin"])
             
             if st.form_submit_button("Crear Usuario"):
-                if crear_usuario(username, password, nombre, rol):
-                    st.success("Usuario creado")
-                    st.rerun()
+                if username and password and nombre:
+                    if crear_usuario(username, password, nombre, rol):
+                        st.success(f"✅ Usuario {username} creado exitosamente")
+                        st.rerun()
+                    else:
+                        st.error("Error: El usuario ya existe")
                 else:
-                    st.error("Error: Usuario ya existe")
+                    st.error("Todos los campos son obligatorios")
 
-# ========== REPORTAR INCIDENTE (para trabajadores) ==========
+# ========== REPORTAR INCIDENTE ==========
 elif menu == "📝 Reportar Incidente":
     st.title("📝 Reportar Incidente")
     
     with st.form("form_incidente"):
-        desc = st.text_area("Descripción del incidente")
+        desc = st.text_area("Descripción del incidente *")
         fecha = st.date_input("Fecha", datetime.now())
-        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
+        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
         
-        if st.form_submit_button("Reportar"):
+        if st.form_submit_button("📝 Reportar Incidente", use_container_width=True):
             if desc and st.session_state.empresa_actual_id:
                 cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
                               (st.session_state.empresa_actual_id, desc, fecha.strftime("%Y-%m-%d"), gravedad))
                 conn.commit()
-                st.success("Incidente reportado")
+                st.success("✅ Incidente reportado exitosamente")
                 st.rerun()
+            else:
+                st.error("Complete la descripción del incidente")
 
-# ========== MIS CAPACITACIONES (para trabajadores) ==========
-elif menu == "📚 Mis Capacitaciones":
-    st.title("📚 Mis Capacitaciones")
-    st.info("Módulo en construcción - Próximamente")
-
-# ========== PELIGROS (admin y responsables) ==========
+# ========== PELIGROS ==========
 elif menu == "⚠️ Peligros":
-    st.title("⚠️ PELIGROS - FASE 2")
+    st.title("⚠️ PELIGROS - FASE 2 (GTC-45)")
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
-        st.dataframe(df)
         
-        with st.form("form_peligro"):
-            tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
-            desc = st.text_area("Descripción")
-            prob = st.slider("Probabilidad", 1, 4, 2)
-            sev = st.slider("Severidad", 1, 3, 2)
-            if st.form_submit_button("Guardar"):
-                if desc:
-                    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad) VALUES (?, ?, ?, ?, ?)",
-                                  (st.session_state.empresa_actual_id, tipo, desc, prob, sev))
-                    conn.commit()
-                    st.rerun()
+        tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
+        
+        with tab1:
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("No hay peligros registrados")
+        
+        with tab2:
+            with st.form("form_peligro"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
+                    desc = st.text_area("Descripción detallada")
+                with col2:
+                    prob = st.slider("Probabilidad (1-4)", 1, 4, 2, help="1:Baja, 2:Media, 3:Alta, 4:Muy Alta")
+                    sev = st.slider("Severidad (1-3)", 1, 3, 2, help="1:Ligero, 2:Dañino, 3:Extremo")
+                    matriz = {(1,1):"III",(1,2):"II",(1,3):"I",(2,1):"III",(2,2):"II",(2,3):"I",
+                              (3,1):"II",(3,2):"I",(3,3):"I",(4,1):"II",(4,2):"I",(4,3):"I"}
+                    nivel = matriz.get((prob, sev), "III")
+                    if nivel == "I":
+                        st.error(f"🔴 NIVEL I - RIESGO ALTO")
+                    elif nivel == "II":
+                        st.warning(f"🟠 NIVEL II - RIESGO MEDIO")
+                    else:
+                        st.info(f"🟡 NIVEL III - RIESGO BAJO")
+                
+                if st.form_submit_button("💾 Guardar Peligro", use_container_width=True):
+                    if desc:
+                        cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?, ?)",
+                                      (st.session_state.empresa_actual_id, tipo, desc, prob, sev, nivel))
+                        conn.commit()
+                        st.success("✅ Peligro guardado")
+                        st.rerun()
+                    else:
+                        st.error("La descripción es obligatoria")
+    else:
+        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
 
 # ========== PLAN DE ACCIÓN ==========
 elif menu == "✅ Plan de Acción":
@@ -440,26 +523,48 @@ elif menu == "✅ Plan de Acción":
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
-        for _, row in df.iterrows():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"**{row['descripcion']}** - {row['responsable']}")
-            with col2:
-                nuevo = st.selectbox("Estado", ["Pendiente", "Completada"], key=row['id'])
-                if nuevo != row['estado']:
-                    cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo, row['id']))
-                    conn.commit()
-                    st.rerun()
         
-        with st.form("form_accion"):
-            desc = st.text_area("Descripción")
-            resp = st.text_input("Responsable")
-            if st.form_submit_button("Guardar"):
-                if desc:
-                    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, 'Pendiente')",
-                                  (st.session_state.empresa_actual_id, desc, resp, datetime.now().strftime("%Y-%m-%d")))
-                    conn.commit()
-                    st.rerun()
+        tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva Acción"])
+        
+        with tab1:
+            if not df.empty:
+                for _, row in df.iterrows():
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"**📌 {row['descripcion']}**")
+                        st.caption(f"👤 Responsable: {row['responsable']} | 📅 Vence: {row['fecha']}")
+                    with col2:
+                        if row['estado'] == "Completada":
+                            st.success("✅ Completada")
+                        else:
+                            nuevo = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
+                                                key=f"act_{row['id']}")
+                            if nuevo != row['estado']:
+                                cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo, row['id']))
+                                conn.commit()
+                                st.rerun()
+                    st.markdown("---")
+            else:
+                st.info("No hay acciones registradas")
+        
+        with tab2:
+            with st.form("form_accion"):
+                desc = st.text_area("Descripción de la acción *")
+                responsable = st.text_input("Responsable *")
+                fecha = st.date_input("Fecha límite", datetime.now())
+                prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
+                
+                if st.form_submit_button("💾 Guardar Acción", use_container_width=True):
+                    if desc and responsable:
+                        cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, 'Pendiente')",
+                                      (st.session_state.empresa_actual_id, desc, responsable, fecha.strftime("%Y-%m-%d")))
+                        conn.commit()
+                        st.success("✅ Acción guardada")
+                        st.rerun()
+                    else:
+                        st.error("Descripción y responsable son obligatorios")
+    else:
+        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
 
 # ========== TRABAJADORES ==========
 elif menu == "👥 Trabajadores":
@@ -467,18 +572,36 @@ elif menu == "👥 Trabajadores":
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
-        st.dataframe(df)
         
-        with st.form("form_trabajador"):
-            nombre = st.text_input("Nombre")
-            cedula = st.text_input("Cédula")
-            cargo = st.text_input("Cargo")
-            if st.form_submit_button("Guardar"):
-                if nombre:
-                    cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
-                                  (st.session_state.empresa_actual_id, nombre, cedula, cargo))
-                    conn.commit()
-                    st.rerun()
+        tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo Trabajador"])
+        
+        with tab1:
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.info("No hay trabajadores registrados")
+        
+        with tab2:
+            with st.form("form_trabajador"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nombre = st.text_input("Nombre completo *")
+                    cedula = st.text_input("Cédula")
+                with col2:
+                    cargo = st.text_input("Cargo")
+                    area = st.text_input("Área/Dependencia")
+                
+                if st.form_submit_button("💾 Registrar Trabajador", use_container_width=True):
+                    if nombre:
+                        cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
+                                      (st.session_state.empresa_actual_id, nombre, cedula, cargo))
+                        conn.commit()
+                        st.success("✅ Trabajador registrado")
+                        st.rerun()
+                    else:
+                        st.error("El nombre es obligatorio")
+    else:
+        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
 
 # ========== INCIDENTES ==========
 elif menu == "📝 Incidentes":
@@ -486,22 +609,33 @@ elif menu == "📝 Incidentes":
     
     if st.session_state.empresa_actual_id:
         with st.form("form_incidente"):
-            desc = st.text_area("Descripción")
+            desc = st.text_area("Descripción del incidente *")
             fecha = st.date_input("Fecha", datetime.now())
-            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
-            if st.form_submit_button("Registrar"):
+            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
+            lugar = st.text_input("Lugar del incidente")
+            
+            if st.form_submit_button("📝 Registrar Incidente", use_container_width=True):
                 if desc:
                     cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
                                   (st.session_state.empresa_actual_id, desc, fecha.strftime("%Y-%m-%d"), gravedad))
                     conn.commit()
+                    st.success("✅ Incidente registrado")
                     st.rerun()
+                else:
+                    st.error("La descripción es obligatoria")
         
-        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
-        st.dataframe(df)
+        st.markdown("---")
+        st.subheader("📋 Historial de Incidentes")
+        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ? ORDER BY id DESC", conn, params=(st.session_state.empresa_actual_id,))
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+    else:
+        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
 
 # ========== CHAT IA ==========
 elif menu == "💬 Chat IA":
-    st.title("💬 CHAT EXPERTO SST")
+    st.title("💬 CHAT EXPERTO EN SST")
+    st.markdown("Consulta sobre normativa, riesgos, o cualquier tema de Seguridad y Salud en el Trabajo")
     
     if "msgs" not in st.session_state:
         st.session_state.msgs = []
@@ -510,11 +644,17 @@ elif menu == "💬 Chat IA":
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if prompt := st.chat_input("Pregunta sobre SST..."):
+    if prompt := st.chat_input("Escribe tu pregunta sobre SST..."):
         st.session_state.msgs.append({"role": "user", "content": prompt})
-        respuesta = call_ia(prompt)
+        with st.chat_message("user"):
+            st.write(prompt)
+        
+        with st.spinner("🤖 IA analizando..."):
+            respuesta = call_ia(prompt)
+        
+        with st.chat_message("assistant"):
+            st.write(respuesta or "Error al conectar con IA")
         st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
-        st.rerun()
 
 # ========== FOOTER ==========
 st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ</div>', unsafe_allow_html=True)
