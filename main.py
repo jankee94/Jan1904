@@ -51,6 +51,7 @@ st.markdown("""
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
+        margin-top: 50px;
     }
     
     .modern-card::before {
@@ -68,11 +69,9 @@ st.markdown("""
         left: 100%;
     }
     
-    /* Logo animado */
     .logo-wrapper {
         text-align: center;
         margin-bottom: 15px;
-        animation: fadeInDown 0.8s ease;
     }
     
     .logo-img {
@@ -85,18 +84,6 @@ st.markdown("""
         transform: scale(1.05);
     }
     
-    @keyframes fadeInDown {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    /* Títulos */
     .app-title {
         font-size: 28px;
         font-weight: 700;
@@ -139,35 +126,6 @@ st.markdown("""
         font-size: 13px;
     }
     
-    /* Iconos dentro de inputs con pseudo-elementos */
-    .stTextInput {
-        position: relative;
-    }
-    
-    .stTextInput:first-of-type::before {
-        content: '👤';
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 10;
-        font-size: 16px;
-        opacity: 0.7;
-        pointer-events: none;
-    }
-    
-    .stTextInput:last-of-type::before {
-        content: '🔒';
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 10;
-        font-size: 16px;
-        opacity: 0.7;
-        pointer-events: none;
-    }
-    
     /* Botón elegante */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
@@ -179,6 +137,7 @@ st.markdown("""
         letter-spacing: 0.5px;
         transition: all 0.3s ease !important;
         box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+        width: 100% !important;
     }
     
     .stButton > button:hover {
@@ -187,7 +146,6 @@ st.markdown("""
         background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
     }
     
-    /* Link olvidó clave */
     .forgot-link {
         text-align: center;
         margin-top: 15px;
@@ -205,7 +163,6 @@ st.markdown("""
         text-decoration: underline;
     }
     
-    /* Footer */
     .footer-modern {
         position: fixed;
         bottom: 15px;
@@ -219,7 +176,6 @@ st.markdown("""
         z-index: 999;
     }
     
-    /* Animación de entrada de la tarjeta */
     .modern-card {
         animation: slideUp 0.6s ease-out;
     }
@@ -232,17 +188,6 @@ st.markdown("""
         to {
             opacity: 1;
             transform: translateY(0);
-        }
-    }
-    
-    /* Ajustes responsivos */
-    @media (max-width: 600px) {
-        .modern-card {
-            padding: 25px 20px;
-            margin: 10px;
-        }
-        .app-title {
-            font-size: 24px;
         }
     }
 </style>
@@ -272,25 +217,22 @@ if "auth" not in st.session_state:
 
 # LOGIN MODERNO
 if not st.session_state.auth:
-    # Contenedor centrado
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown('<div class="modern-card">', unsafe_allow_html=True)
         
-        # Logo y título
         st.markdown("""
-        <div class="logo-wrapper">
+        <div class="logo-wrapper" style="text-align:center">
             <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img">
             <div class="app-title">SG-SST PHVA</div>
             <div class="app-slogan">✨ Seguridad y Salud, compromiso de todos ✨</div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Formulario
         with st.form("login_moderno"):
-            # Usuario con icono (el CSS agrega el icono)
-            username = st.text_input("", placeholder="Usuario", label_visibility="collapsed", key="user_input")
-            password = st.text_input("", type="password", placeholder="Contraseña", label_visibility="collapsed", key="pass_input")
+            # CORREGIDO: label con texto visible (no vacío)
+            username = st.text_input("Usuario", placeholder="Ingrese su usuario", label_visibility="visible")
+            password = st.text_input("Contraseña", type="password", placeholder="Ingrese su contraseña", label_visibility="visible")
             
             submitted = st.form_submit_button("🚀 INGRESAR AL SISTEMA", use_container_width=True)
             
@@ -303,7 +245,6 @@ if not st.session_state.auth:
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
         
-        # Enlace de ayuda
         st.markdown("""
         <div class="forgot-link">
             <a href="#">🔐 ¿Olvidaste tu contraseña? Contacta al administrador</a>
@@ -312,7 +253,6 @@ if not st.session_state.auth:
         
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Footer
     st.markdown("""
     <div class="footer-modern">
         🛡️ SG-SST PHVA | Sistema de Gestión con IA | Desarrollado por JAN BENITEZ
@@ -320,7 +260,7 @@ if not st.session_state.auth:
     """, unsafe_allow_html=True)
     st.stop()
 
-# DASHBOARD POST-LOGIN (simple por ahora)
+# DASHBOARD POST-LOGIN
 st.markdown("""
 <style>
     .dashboard-header {
