@@ -4,191 +4,70 @@ import pandas as pd
 import requests
 from datetime import datetime
 
-st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="centered")
+st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
-# CSS MODERNO Y ATRACTIVO
+# CSS para login moderno
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
-    * {
-        font-family: 'Inter', sans-serif;
-    }
-    
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-        position: relative;
-        overflow: hidden;
     }
-    
-    /* Partículas de fondo */
-    .stApp::before {
-        content: '';
-        position: absolute;
-        width: 200%;
-        height: 200%;
-        top: -50%;
-        left: -50%;
-        background: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-        background-size: 40px 40px;
-        animation: float 20s linear infinite;
-        pointer-events: none;
+    .login-card {
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 30px;
+        padding: 40px 30px;
+        box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
     }
-    
-    @keyframes float {
-        0% { transform: translate(0, 0) rotate(0deg); }
-        100% { transform: translate(-10%, -10%) rotate(5deg); }
-    }
-    
-    /* Tarjeta moderna */
-    .modern-card {
-        background: rgba(20, 20, 40, 0.65);
-        backdrop-filter: blur(15px);
-        border-radius: 32px;
-        padding: 35px 30px;
-        border: 1px solid rgba(255,255,255,0.15);
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-        margin-top: 50px;
-    }
-    
-    .modern-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
-        transition: left 0.5s;
-    }
-    
-    .modern-card:hover::before {
-        left: 100%;
-    }
-    
-    .logo-wrapper {
-        text-align: center;
-        margin-bottom: 15px;
-    }
-    
     .logo-img {
-        width: 70px;
-        filter: drop-shadow(0 8px 20px rgba(0,0,0,0.3));
-        transition: transform 0.3s ease;
+        width: 80px;
+        display: block;
+        margin: 0 auto 15px auto;
     }
-    
-    .logo-img:hover {
-        transform: scale(1.05);
-    }
-    
-    .app-title {
-        font-size: 28px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #fff, #a0c0ff, #667eea);
+    .main-title {
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #fff 0%, #a8c0ff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin: 8px 0 4px 0;
-        letter-spacing: -0.5px;
+        text-align: center;
+        margin: 10px 0 5px 0;
     }
-    
-    .app-slogan {
-        font-size: 13px;
+    .slogan {
         color: rgba(255,255,255,0.7);
-        font-weight: 400;
-        margin-bottom: 20px;
-        border-bottom: 1px dashed rgba(255,255,255,0.2);
-        display: inline-block;
-        padding-bottom: 5px;
+        font-size: 14px;
+        font-style: italic;
+        text-align: center;
+        margin-bottom: 30px;
     }
-    
-    /* Inputs modernos */
     .stTextInput > div > div > input {
-        background: rgba(255,255,255,0.08) !important;
+        background: rgba(255,255,255,0.1) !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         color: white !important;
-        padding: 12px 15px 12px 42px !important;
-        font-size: 14px !important;
-        transition: all 0.3s ease !important;
+        padding: 12px 15px !important;
     }
-    
-    .stTextInput > div > div > input:focus {
-        border-color: #667eea !important;
-        box-shadow: 0 0 0 3px rgba(102,126,234,0.3) !important;
-        background: rgba(255,255,255,0.12) !important;
-    }
-    
-    .stTextInput > div > div > input::placeholder {
-        color: rgba(255,255,255,0.5);
-        font-size: 13px;
-    }
-    
-    /* Botón elegante */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         border: none !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         padding: 12px !important;
-        font-weight: 600 !important;
-        font-size: 15px !important;
-        letter-spacing: 0.5px;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+        font-weight: bold !important;
+        font-size: 16px !important;
         width: 100% !important;
     }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 28px rgba(102,126,234,0.5);
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
-    }
-    
-    .forgot-link {
-        text-align: center;
-        margin-top: 15px;
-    }
-    
-    .forgot-link a {
-        color: rgba(255,255,255,0.6);
-        text-decoration: none;
-        font-size: 12px;
-        transition: color 0.2s;
-    }
-    
-    .forgot-link a:hover {
-        color: #a0c0ff;
-        text-decoration: underline;
-    }
-    
-    .footer-modern {
+    .developer-footer {
         position: fixed;
-        bottom: 15px;
+        bottom: 0;
         left: 0;
         right: 0;
         text-align: center;
-        font-size: 11px;
-        color: rgba(255,255,255,0.4);
-        background: transparent;
-        padding: 8px;
+        padding: 10px;
+        background: rgba(0,0,0,0.6);
+        color: rgba(255,255,255,0.6);
+        font-size: 12px;
         z-index: 999;
-    }
-    
-    .modern-card {
-        animation: slideUp 0.6s ease-out;
-    }
-    
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -197,44 +76,131 @@ st.markdown("""
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, nombre TEXT, rol TEXT)''')
-cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
+cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    nombre TEXT,
+    rol TEXT DEFAULT 'trabajador',
+    activo INTEGER DEFAULT 1
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS empresa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nit TEXT,
+    nombre TEXT,
+    trabajadores INTEGER,
+    arl TEXT,
+    diagnostico TEXT,
+    fecha TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER,
+    tipo TEXT,
+    descripcion TEXT,
+    probabilidad INTEGER,
+    severidad INTEGER,
+    nivel TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER,
+    descripcion TEXT,
+    responsable TEXT,
+    fecha TEXT,
+    estado TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER,
+    nombre TEXT,
+    cedula TEXT,
+    cargo TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER,
+    descripcion TEXT,
+    fecha TEXT,
+    gravedad TEXT
+)''')
+
+# Usuario admin por defecto
+cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
 if not cursor.fetchone():
-    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)", ('admin','admin123','Administrador','admin'))
+    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?, ?, ?, ?)",
+                  ('admin', 'admin123', 'Administrador', 'admin'))
     conn.commit()
 
-def verificar_login(u, p):
-    cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?", (u, p))
-    r = cursor.fetchone()
-    if r:
-        return {"nombre": r[3], "rol": r[4]}
+conn.commit()
+
+def verificar_login(username, password):
+    cursor.execute("SELECT * FROM usuarios WHERE username = ? AND password = ? AND activo = 1", (username, password))
+    user = cursor.fetchone()
+    if user:
+        return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
     return None
+
+def guardar_diagnostico(nit, nombre, trabajadores, arl, diagnostico):
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO empresa (nit, nombre, trabajadores, arl, diagnostico, fecha) VALUES (?, ?, ?, ?, ?, ?)",
+                  (nit, nombre, trabajadores, arl, diagnostico, fecha))
+    conn.commit()
+    return cursor.lastrowid
+
+def obtener_diagnosticos():
+    return pd.read_sql_query("SELECT id, nit, nombre, trabajadores, arl, fecha FROM empresa ORDER BY id DESC", conn)
+
+def obtener_diagnostico_por_id(id):
+    df = pd.read_sql_query("SELECT * FROM empresa WHERE id = ?", conn, params=(id,))
+    return df.iloc[0].to_dict() if not df.empty else None
+
+def set_empresa_actual(id):
+    st.session_state.empresa_actual_id = id
+    st.session_state.empresa_actual = obtener_diagnostico_por_id(id)
+
+def call_ia(prompt):
+    api_key = "AIzaSyD3QhEohGJeYhVtM7JmBZ2nXvZJFxJZv3U"
+    try:
+        url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
+        headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
+        data = {"contents": [{"parts": [{"text": prompt}]}]}
+        r = requests.post(url, json=data, headers=headers, timeout=30)
+        if r.status_code == 200:
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except:
+        pass
+    return "Error al conectar con IA."
 
 # Sesión
 if "auth" not in st.session_state:
     st.session_state.auth = False
+if "user" not in st.session_state:
     st.session_state.user = None
+if "empresa_actual_id" not in st.session_state:
+    st.session_state.empresa_actual_id = None
+if "empresa_actual" not in st.session_state:
+    st.session_state.empresa_actual = None
 
-# LOGIN MODERNO
+# ========== LOGIN ==========
 if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div class="modern-card">', unsafe_allow_html=True)
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=80)
+        st.markdown('<h1 class="main-title">SG-SST PHVA</h1>', unsafe_allow_html=True)
+        st.markdown('<div class="slogan">"Seguridad y Salud, compromiso de todos"</div>', unsafe_allow_html=True)
         
-        st.markdown("""
-        <div class="logo-wrapper" style="text-align:center">
-            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img">
-            <div class="app-title">SG-SST PHVA</div>
-            <div class="app-slogan">✨ Seguridad y Salud, compromiso de todos ✨</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        with st.form("login_moderno"):
-            # CORREGIDO: label con texto visible (no vacío)
-            username = st.text_input("Usuario", placeholder="Ingrese su usuario", label_visibility="visible")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingrese su contraseña", label_visibility="visible")
+        with st.form("login_form"):
+            username = st.text_input("USUARIO", placeholder="Ingrese su usuario")
+            password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingrese su contraseña")
             
-            submitted = st.form_submit_button("🚀 INGRESAR AL SISTEMA", use_container_width=True)
+            submitted = st.form_submit_button("INGRESAR", use_container_width=True)
             
             if submitted:
                 user = verificar_login(username, password)
@@ -245,48 +211,150 @@ if not st.session_state.auth:
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
         
-        st.markdown("""
-        <div class="forgot-link">
-            <a href="#">🔐 ¿Olvidaste tu contraseña? Contacta al administrador</a>
-        </div>
-        """, unsafe_allow_html=True)
-        
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown("""
-    <div class="footer-modern">
-        🛡️ SG-SST PHVA | Sistema de Gestión con IA | Desarrollado por JAN BENITEZ
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ</div>', unsafe_allow_html=True)
     st.stop()
 
-# DASHBOARD POST-LOGIN
-st.markdown("""
-<style>
-    .dashboard-header {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        padding: 20px;
-        border-radius: 20px;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-    .welcome-text {
-        font-size: 24px;
-        font-weight: 600;
-        color: white;
-    }
-</style>
-""", unsafe_allow_html=True)
+# ========== SIDEBAR ==========
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=50)
+    st.markdown(f"**👤 {st.session_state.user['nombre']}**")
+    st.markdown(f"**Rol:** {st.session_state.user['rol'].upper()}")
+    st.markdown("---")
+    
+    if st.session_state.user['rol'] == 'admin':
+        diagnosticos = obtener_diagnosticos()
+        if not diagnosticos.empty:
+            empresas_opciones = diagnosticos.apply(lambda x: f"{x['id']} - {x['nombre']}", axis=1).tolist()
+            empresa_seleccionada = st.selectbox("🏢 Empresa", ["-- Nueva --"] + empresas_opciones)
+            if empresa_seleccionada != "-- Nueva --":
+                id_empresa = int(empresa_seleccionada.split(" - ")[0])
+                if st.session_state.empresa_actual_id != id_empresa:
+                    set_empresa_actual(id_empresa)
+                    st.rerun()
+    
+    if st.session_state.empresa_actual:
+        st.success(f"🏢 {st.session_state.empresa_actual.get('nombre', '')[:20]}")
+    
+    st.markdown("---")
+    
+    menu = st.radio("📋 MENU", [
+        "📊 Dashboard",
+        "🤖 Diagnóstico IA",
+        "⚠️ Peligros",
+        "✅ Plan de Acción",
+        "👥 Trabajadores",
+        "📝 Incidentes",
+        "💬 Chat IA"
+    ])
+    
+    if st.button("🚪 Cerrar Sesión", use_container_width=True):
+        st.session_state.auth = False
+        st.rerun()
 
-st.markdown(f"""
-<div class="dashboard-header">
-    <div class="welcome-text">👋 ¡Bienvenido, {st.session_state.user['nombre']}!</div>
-    <p style="color:rgba(255,255,255,0.8); margin-top:5px">Rol: {st.session_state.user['rol'].upper()}</p>
-</div>
-""", unsafe_allow_html=True)
+# ========== DASHBOARD ==========
+if menu == "📊 Dashboard":
+    st.title("📊 Dashboard SST")
+    if st.session_state.empresa_actual:
+        emp = st.session_state.empresa_actual
+        st.success(f"🏢 **{emp.get('nombre', '')}** | 👥 {emp.get('trabajadores', 0)} trabajadores")
+    else:
+        st.warning("⚠️ Seleccione o cree una empresa en 'Diagnóstico IA'")
 
-if st.button("🚪 Cerrar Sesión", use_container_width=True):
-    st.session_state.auth = False
-    st.rerun()
+# ========== DIAGNÓSTICO IA ==========
+elif menu == "🤖 Diagnóstico IA":
+    st.title("🤖 DIAGNÓSTICO IA")
+    
+    with st.form("form_diagnostico"):
+        nombre = st.text_input("Nombre de la empresa *")
+        trabajadores = st.number_input("Número de trabajadores *", min_value=1, value=10)
+        arl = st.selectbox("ARL *", ["Positiva", "Sura", "Colpatria"])
+        
+        if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO", use_container_width=True):
+            if nombre:
+                with st.spinner("🤖 IA generando diagnóstico..."):
+                    respuesta = call_ia(f"Diagnóstico SST para {nombre} con {trabajadores} trabajadores")
+                    empresa_id = guardar_diagnostico("", nombre, trabajadores, arl, respuesta)
+                    set_empresa_actual(empresa_id)
+                    st.success("✅ Diagnóstico generado")
+                    st.rerun()
+            else:
+                st.error("Nombre obligatorio")
 
-st.info("📌 Próximamente: Módulos de Matriz Legal, Auditorías, Plan Anual y más...")
+# ========== PELIGROS ==========
+elif menu == "⚠️ Peligros":
+    st.title("⚠️ Peligros")
+    if st.session_state.empresa_actual_id:
+        df = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
+        with st.form("add_peligro"):
+            tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
+            desc = st.text_area("Descripción")
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion) VALUES (?, ?, ?)",
+                              (st.session_state.empresa_actual_id, tipo, desc))
+                conn.commit()
+                st.rerun()
+
+# ========== PLAN DE ACCIÓN ==========
+elif menu == "✅ Plan de Acción":
+    st.title("✅ Plan de Acción")
+    if st.session_state.empresa_actual_id:
+        df = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
+        with st.form("add_accion"):
+            desc = st.text_area("Acción")
+            resp = st.text_input("Responsable")
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, estado) VALUES (?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, desc, resp, "Pendiente"))
+                conn.commit()
+                st.rerun()
+
+# ========== TRABAJADORES ==========
+elif menu == "👥 Trabajadores":
+    st.title("👥 Trabajadores")
+    if st.session_state.empresa_actual_id:
+        df = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
+        with st.form("add_trabajador"):
+            nombre = st.text_input("Nombre")
+            cedula = st.text_input("Cédula")
+            cargo = st.text_input("Cargo")
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, nombre, cedula, cargo))
+                conn.commit()
+                st.rerun()
+
+# ========== INCIDENTES ==========
+elif menu == "📝 Incidentes":
+    st.title("📝 Incidentes")
+    if st.session_state.empresa_actual_id:
+        with st.form("add_incidente"):
+            desc = st.text_area("Descripción")
+            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
+            if st.form_submit_button("Reportar"):
+                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, desc, datetime.now().strftime("%Y-%m-%d"), gravedad))
+                conn.commit()
+                st.rerun()
+        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
+
+# ========== CHAT IA ==========
+elif menu == "💬 Chat IA":
+    st.title("💬 Chat IA")
+    if "msgs" not in st.session_state:
+        st.session_state.msgs = []
+    for msg in st.session_state.msgs:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+    if prompt := st.chat_input("Pregunta..."):
+        st.session_state.msgs.append({"role": "user", "content": prompt})
+        respuesta = call_ia(prompt)
+        st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
+        st.rerun()
+
+st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ</div>', unsafe_allow_html=True)
