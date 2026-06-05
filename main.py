@@ -6,41 +6,41 @@ from datetime import datetime
 
 st.set_page_config(page_title="SG-SST", page_icon="🔄", layout="centered")
 
-# CSS ultra compacto
+# CSS tamaño medio (30% más grande que el ultra compacto)
 st.markdown("""
 <style>
     .block-container {
-        padding: 0.2rem !important;
-        max-width: 220px !important;
+        padding: 0.5rem !important;
+        max-width: 320px !important;
     }
     .stTextInput > div > div > input {
         background: rgba(255,255,255,0.15) !important;
         border: none !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         color: white !important;
-        padding: 5px 10px !important;
-        font-size: 12px !important;
-        height: 32px !important;
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        height: 42px !important;
     }
     .stButton > button {
         background: linear-gradient(135deg, #667eea, #764ba2) !important;
-        border-radius: 8px !important;
-        padding: 5px !important;
-        font-size: 12px !important;
-        height: 35px !important;
+        border-radius: 10px !important;
+        padding: 8px !important;
+        font-size: 14px !important;
+        height: 45px !important;
         width: 100% !important;
     }
     .stForm {
         background: rgba(255,255,255,0.08);
         backdrop-filter: blur(10px);
-        border-radius: 15px;
-        padding: 15px !important;
+        border-radius: 20px;
+        padding: 20px !important;
     }
     .st-emotion-cache-1v0mbdj {
-        width: 220px !important;
+        width: 320px !important;
     }
     footer { display: none; }
-    hr { margin: 8px 0 !important; }
+    hr { margin: 12px 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,12 +66,12 @@ if "auth" not in st.session_state:
     st.session_state.auth = False
     st.session_state.user = None
 
-# LOGIN ULTRA COMPACTO
+# LOGIN TAMAÑO MEDIO
 if not st.session_state.auth:
     st.markdown("<div style='text-align:center'>", unsafe_allow_html=True)
-    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=40)
-    st.markdown("<h3 style='color:white; font-size:16px; margin:2px 0'>SG-SST PHVA</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='color:gray; font-size:10px; margin:0'>Seguridad y Salud</p>", unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=55)
+    st.markdown("<h3 style='color:white; font-size:20px; margin:5px 0'>SG-SST PHVA</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:gray; font-size:12px; margin:0'>Seguridad y Salud, compromiso de todos</p>", unsafe_allow_html=True)
     st.markdown("<hr>", unsafe_allow_html=True)
     
     with st.form("login"):
