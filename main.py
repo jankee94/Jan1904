@@ -8,10 +8,10 @@ from datetime import datetime
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="centered")
 
-# CSS para ocupar toda la pantalla sin scroll
+# CSS para forzar centrado absoluto
 st.markdown("""
 <style>
-    /* Eliminar padding y margin de Streamlit */
+    /* Eliminar TODO el padding de Streamlit */
     .main > div {
         padding: 0 !important;
         margin: 0 !important;
@@ -20,21 +20,23 @@ st.markdown("""
         padding: 0 !important;
         margin: 0 !important;
         max-width: 100% !important;
+        position: relative !important;
+        top: 0 !important;
     }
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-        height: 100vh !important;
-        display: flex;
-        align-items: center !important;
-        justify-content: center !important;
     }
-    /* Contenedor flex para centrar */
-    .flex-container {
+    /* Centrado absoluto con position fixed */
+    .login-wrapper {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 100vh;
-        width: 100%;
+        z-index: 999;
     }
     .login-card {
         background: rgba(20, 20, 40, 0.75);
@@ -44,7 +46,7 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.15);
         box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         width: 380px;
-        margin: 0 auto;
+        text-align: center;
         animation: fadeIn 0.6s ease-out;
     }
     @keyframes fadeIn {
@@ -62,13 +64,11 @@ st.markdown("""
         background: linear-gradient(135deg, #fff, #a8c0ff, #667eea);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-align: center;
         margin: 0 0 5px 0;
     }
     .app-slogan {
         font-size: 12px;
         color: rgba(255,255,255,0.65);
-        text-align: center;
         margin-bottom: 25px;
         font-style: italic;
     }
@@ -133,7 +133,13 @@ st.markdown("""
     label {
         color: rgba(255,255,255,0.8) !important;
         font-size: 13px !important;
+        text-align: left !important;
+        display: block !important;
         margin-bottom: 5px !important;
+    }
+    /* Ocultar header de Streamlit */
+    header {
+        display: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -149,7 +155,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
     nombre TEXT,
     rol TEXT DEFAULT 'trabajador',
     email TEXT,
-    reset_token TEXT,
     activo INTEGER DEFAULT 1
 )''')
 
@@ -198,7 +203,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
     gravedad TEXT
 )''')
 
-# Usuario admin por defecto
+# Usuario admin
 cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
 if not cursor.fetchone():
     cursor.execute("INSERT INTO usuarios (username, password, nombre, rol, email) VALUES (?, ?, ?, ?, ?)",
@@ -211,7 +216,7 @@ def verificar_login(username, password):
     cursor.execute("SELECT * FROM usuarios WHERE username = ? AND password = ? AND activo = 1", (username, password))
     user = cursor.fetchone()
     if user:
-        return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4], "email": user[6] if len(user) > 6 else ""}
+        return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
     return None
 
 def reset_password(username, email):
@@ -248,10 +253,9 @@ if "empresa_actual_id" not in st.session_state:
 if "empresa_actual" not in st.session_state:
     st.session_state.empresa_actual = None
 
-# ========== LOGIN CENTRADO SIN SCROLL ==========
+# ========== LOGIN CENTRADO ABSOLUTO ==========
 if not st.session_state.auth:
-    # Contenedor flex para centrar verticalmente
-    st.markdown('<div class="flex-container">', unsafe_allow_html=True)
+    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
     
     if not st.session_state.show_reset:
         st.markdown("""
@@ -315,7 +319,7 @@ if not st.session_state.auth:
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# ========== DASHBOARD POST-LOGIN ==========
+# ========== DASHBOARD ==========
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
 st.success(f"✅ Bienvenido {st.session_state.user['nombre']}")
