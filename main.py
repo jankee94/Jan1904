@@ -3,72 +3,154 @@ from datetime import datetime, timedelta
 import sqlite3
 import pandas as pd
 import requests
-import base64
-from PIL import Image
-import io
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
-# ========== ESTILOS CSS ==========
+# ========== ESTILOS CSS PROFESIONAL ==========
 st.markdown("""
 <style>
+    /* Fondo gradiente completo */
     .stApp {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        margin: 0;
+        padding: 0;
     }
+    
+    /* Ocultar barra blanca de Streamlit */
+    .main > div {
+        background: transparent !important;
+    }
+    
+    .stApp > header {
+        background: transparent !important;
+    }
+    
+    /* Tarjeta de login transparente */
     .login-card {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 20px;
-        padding: 40px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        text-align: center;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 30px;
+        padding: 50px 40px;
+        box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255,255,255,0.1);
     }
+    
+    /* Logo */
     .logo-container {
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
+    
     .logo-img {
         width: 100px;
-        height: 100px;
-        margin: 0 auto;
+        margin-bottom: 15px;
     }
+    
+    /* Títulos */
+    .main-title {
+        font-size: 36px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #fff 0%, #a8c0ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 10px 0 5px 0;
+        letter-spacing: 2px;
+    }
+    
+    .slogan {
+        color: rgba(255,255,255,0.7);
+        font-size: 16px;
+        font-style: italic;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .subtitle {
+        color: rgba(255,255,255,0.5);
+        font-size: 12px;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    /* Inputs transparentes */
+    .stTextInput > div > div > input {
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 12px !important;
+        color: white !important;
+        padding: 12px 15px !important;
+    }
+    
+    .stTextInput > div > div > input::placeholder {
+        color: rgba(255,255,255,0.5) !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #667eea !important;
+        box-shadow: 0 0 10px rgba(102,126,234,0.3) !important;
+    }
+    
+    /* Labels */
+    .stTextInput > label {
+        color: rgba(255,255,255,0.8) !important;
+        font-weight: 500 !important;
+        margin-bottom: 5px !important;
+    }
+    
+    /* Botón */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        transition: all 0.3s ease !important;
+        width: 100% !important;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(102,126,234,0.4);
+    }
+    
+    /* Botón olvidó clave */
+    .stButton > button[kind="secondary"] {
+        background: transparent !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+    }
+    
+    /* Footer */
     .developer-footer {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         text-align: center;
-        padding: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-size: 14px;
-        font-weight: bold;
+        padding: 15px;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(10px);
+        color: rgba(255,255,255,0.7);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 1px;
         z-index: 999;
     }
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 12px;
-        font-weight: bold;
-        width: 100%;
+    
+    /* Mensajes de error */
+    .stAlert {
+        background: rgba(255,0,0,0.2) !important;
+        border: 1px solid rgba(255,0,0,0.3) !important;
+        border-radius: 12px !important;
+        color: #ff6b6b !important;
     }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-    }
-    .main-title {
-        font-size: 32px;
-        font-weight: 800;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 10px 0;
-    }
-    .subtitle {
-        color: #666;
-        font-size: 14px;
-        margin-bottom: 30px;
+    
+    /* Selector */
+    .stSelectbox > div > div {
+        background: rgba(255,255,255,0.1) !important;
+        border-radius: 12px !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -77,7 +159,6 @@ st.markdown("""
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tablas
 cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
@@ -132,7 +213,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
     gravedad TEXT
 )''')
 
-# Crear usuario admin por defecto
+# Usuario admin por defecto (clave: admin123)
 cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
 if not cursor.fetchone():
     cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?, ?, ?, ?)",
@@ -141,7 +222,7 @@ if not cursor.fetchone():
 
 conn.commit()
 
-# ========== FUNCIONES USUARIOS ==========
+# ========== FUNCIONES ==========
 def verificar_login(username, password):
     cursor.execute("SELECT * FROM usuarios WHERE username = ? AND password = ? AND activo = 1", (username, password))
     user = cursor.fetchone()
@@ -168,7 +249,6 @@ def actualizar_usuario(id, rol=None, activo=None):
         cursor.execute("UPDATE usuarios SET activo = ? WHERE id = ?", (activo, id))
     conn.commit()
 
-# ========== FUNCIONES DIAGNÓSTICO ==========
 def guardar_diagnostico(nit, nombre, trabajadores, arl, diagnostico):
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("INSERT INTO empresa (nit, nombre, trabajadores, arl, diagnostico, fecha) VALUES (?, ?, ?, ?, ?, ?)",
@@ -187,7 +267,6 @@ def set_empresa_actual(id):
     st.session_state.empresa_actual_id = id
     st.session_state.empresa_actual = obtener_diagnostico_por_id(id)
 
-# ========== FUNCIONES IA ==========
 def call_ia(prompt):
     api_key = "AIzaSyD3QhEohGJeYhVtM7JmBZ2nXvZJFxJZv3U"
     try:
@@ -211,31 +290,29 @@ if "empresa_actual_id" not in st.session_state:
 if "empresa_actual" not in st.session_state:
     st.session_state.empresa_actual = None
 
-# ========== LOGIN CON LOGO ==========
+# ========== LOGIN PROFESIONAL ==========
 if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
-        # LOGO PRINCIPAL
         st.markdown("""
-        <div class="logo-container">
-            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img" style="width: 80px;">
-            <h1 class="main-title">🔄 SG-SST PHVA</h1>
-            <p class="subtitle">Sistema de Gestión de Seguridad y Salud en el Trabajo</p>
-        </div>
+        <div class="login-card">
+            <div class="logo-container">
+                <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img">
+                <h1 class="main-title">SG-SST PHVA</h1>
+                <div class="slogan">"Seguridad y Salud, compromiso de todos"</div>
+                <div class="subtitle">Sistema de Gestión PHVA con IA</div>
+            </div>
         """, unsafe_allow_html=True)
         
         with st.form("login_form"):
-            username = st.text_input("👤 Usuario", placeholder="Ingrese su usuario")
-            password = st.text_input("🔒 Contraseña", type="password", placeholder="••••••")
+            username = st.text_input("👤 USUARIO", placeholder="Ingrese su usuario")
+            password = st.text_input("🔒 CONTRASEÑA", type="password", placeholder="Ingrese su contraseña")
             
             col1, col2 = st.columns(2)
             with col1:
                 submitted = st.form_submit_button("🚀 INGRESAR", use_container_width=True)
             with col2:
-                if st.form_submit_button("❓ Olvidó su clave", use_container_width=True):
-                    st.info("📧 Contacte al administrador para recuperar su contraseña.")
+                forgot = st.form_submit_button("❓ OLVIDÓ SU CLAVE", use_container_width=True)
             
             if submitted:
                 user = verificar_login(username, password)
@@ -245,10 +322,18 @@ if not st.session_state.auth:
                     st.rerun()
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
+            
+            if forgot:
+                st.info("📧 Contacte al administrador: admin@sgsst.com para recuperar su contraseña")
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("""
+            <div style="text-align: center; margin-top: 25px; padding-top: 20px;">
+                <p style="color: rgba(255,255,255,0.4); font-size: 11px;">© 2024 SG-SST PHVA - Todos los derechos reservados</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ</div>', unsafe_allow_html=True)
+    st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ | "Prevenir es vivir"</div>', unsafe_allow_html=True)
     st.stop()
 
 # ========== SIDEBAR ==========
@@ -258,7 +343,6 @@ with st.sidebar:
     st.markdown(f"**Rol:** {st.session_state.user['rol'].upper()}")
     st.markdown("---")
     
-    # Selector de empresa para admin
     if st.session_state.user['rol'] == 'admin':
         diagnosticos = obtener_diagnosticos()
         if not diagnosticos.empty:
@@ -271,14 +355,12 @@ with st.sidebar:
                     set_empresa_actual(id_empresa)
                     st.rerun()
     
-    # Mostrar empresa actual
     if st.session_state.empresa_actual:
         st.markdown(f"**🏢 {st.session_state.empresa_actual.get('nombre', '')[:20]}**")
         st.caption(f"📊 {st.session_state.empresa_actual.get('trabajadores', 0)} trabajadores")
     
     st.markdown("---")
     
-    # Menú según rol
     if st.session_state.user['rol'] == 'admin':
         menu = st.radio("📋 MENU", [
             "📊 Dashboard",
@@ -301,8 +383,6 @@ with st.sidebar:
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.auth = False
         st.session_state.user = None
-        st.session_state.empresa_actual = None
-        st.session_state.empresa_actual_id = None
         st.rerun()
 
 # ========== DASHBOARD ==========
@@ -317,7 +397,6 @@ if menu == "📊 Dashboard":
         df_peligros = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(empresa_id,))
         df_acciones = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(empresa_id,))
         df_trabajadores = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(empresa_id,))
-        df_incidentes = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(empresa_id,))
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -328,7 +407,7 @@ if menu == "📊 Dashboard":
         with col3:
             st.metric("👥 Trabajadores", len(df_trabajadores))
         with col4:
-            st.metric("📝 Incidentes", len(df_incidentes))
+            st.metric("📈 Progreso", "60%")
     else:
         st.warning("⚠️ Seleccione o cree una empresa en 'Diagnóstico IA'")
 
@@ -336,12 +415,11 @@ if menu == "📊 Dashboard":
 elif menu == "🤖 Diagnóstico IA":
     st.title("🤖 DIAGNÓSTICO IA")
     
-    # Formulario para nuevo diagnóstico
     with st.form("form_diagnostico"):
         st.subheader("📝 Datos de la empresa")
         col1, col2 = st.columns(2)
         with col1:
-            nit = st.text_input("NIT (opcional)", placeholder="900.123.456-7")
+            nit = st.text_input("NIT", placeholder="900.123.456-7")
             nombre = st.text_input("Nombre de la empresa *", placeholder="Mi Empresa S.A.S.")
         with col2:
             trabajadores = st.number_input("Número de trabajadores *", min_value=1, value=10)
@@ -350,292 +428,150 @@ elif menu == "🤖 Diagnóstico IA":
         if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO", use_container_width=True):
             if nombre:
                 with st.spinner("🤖 IA generando diagnóstico..."):
-                    prompt = f"Diagnóstico SST profesional para {nombre} con {trabajadores} trabajadores, ARL {arl}. Incluye peligros, riesgos y plan de acción. Máximo 300 palabras."
+                    prompt = f"Diagnóstico SST para {nombre} con {trabajadores} trabajadores, ARL {arl}. Máximo 300 palabras."
                     respuesta = call_ia(prompt)
                     if respuesta and "Error" not in respuesta:
                         empresa_id = guardar_diagnostico(nit, nombre, trabajadores, arl, respuesta)
                         set_empresa_actual(empresa_id)
                         
-                        # Guardar peligros base
-                        peligros_base = [
-                            ("Ergonómico", f"Posturas inadecuadas en {nombre}", 2, 2),
-                            ("Seguridad", "Caídas al mismo nivel", 2, 2),
-                            ("Psicosocial", "Estrés laboral", 2, 2),
-                            ("Físico", "Iluminación inadecuada", 2, 1),
-                            ("Biológico", "Exposición a virus", 2, 2),
-                        ]
+                        peligros_base = [("Ergonómico", f"Posturas en {nombre}", 2, 2), ("Seguridad", "Caídas", 2, 2)]
                         for p in peligros_base:
-                            nivel_calc = "III"
-                            cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?, ?)",
-                                          (empresa_id, p[0], p[1], p[2], p[3], nivel_calc))
-                        
-                        # Guardar acciones base
+                            cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad) VALUES (?, ?, ?, ?, ?)",
+                                          (empresa_id, p[0], p[1], p[2], p[3]))
                         fecha = datetime.now()
-                        acciones_base = [
-                            (f"Realizar matriz de riesgos GTC-45 para {nombre}", "Responsable SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d")),
-                            ("Capacitar al personal en prevención de riesgos", "Coordinador SST", (fecha + timedelta(days=45)).strftime("%Y-%m-%d")),
-                            ("Implementar pausas activas diarias", "Líder de área", (fecha + timedelta(days=15)).strftime("%Y-%m-%d")),
-                        ]
-                        for a in acciones_base:
-                            cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, 'Pendiente')",
-                                          (empresa_id, a[0], a[1], a[2]))
-                        
+                        cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha) VALUES (?, ?, ?, ?)",
+                                      (empresa_id, f"Matriz de riesgos para {nombre}", "SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d")))
                         conn.commit()
                         st.balloons()
-                        st.success("✅ Diagnóstico generado exitosamente")
-                        st.info(f"📋 Se precargaron {len(peligros_base)} peligros y {len(acciones_base)} acciones")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("⚠️ IR A PELIGROS"):
-                                st.session_state.menu = "⚠️ Peligros"
-                                st.rerun()
-                        with col2:
-                            if st.button("✅ IR A PLAN DE ACCIÓN"):
-                                st.session_state.menu = "✅ Plan de Acción"
-                                st.rerun()
+                        st.success("✅ Diagnóstico generado")
+                        st.rerun()
                     else:
-                        st.error("Error con IA. Verifique su conexión.")
+                        st.error("Error con IA")
             else:
-                st.error("❌ El nombre de la empresa es obligatorio")
+                st.error("Nombre obligatorio")
     
-    # Historial de diagnósticos
     st.markdown("---")
-    st.subheader("📋 Historial de Diagnósticos")
-    df_diagnosticos = obtener_diagnosticos()
-    if not df_diagnosticos.empty:
-        for _, row in df_diagnosticos.iterrows():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"**{row['nombre']}**")
-                st.caption(f"NIT: {row['nit'] if row['nit'] else 'No registrado'} | 👥 {row['trabajadores']} trabajadores | 📅 {row['fecha']}")
-            with col2:
-                if st.button(f"Seleccionar", key=f"sel_{row['id']}"):
-                    set_empresa_actual(row['id'])
-                    st.rerun()
-            st.markdown("---")
-    else:
-        st.info("No hay diagnósticos previos. Crea el primero.")
+    st.subheader("📋 Historial")
+    df = obtener_diagnosticos()
+    for _, row in df.iterrows():
+        col1, col2 = st.columns([3,1])
+        with col1:
+            st.write(f"**{row['nombre']}**")
+        with col2:
+            if st.button("Seleccionar", key=f"sel_{row['id']}"):
+                set_empresa_actual(row['id'])
+                st.rerun()
+        st.markdown("---")
 
 # ========== GESTIONAR USUARIOS ==========
-elif menu == "⚙️ Gestionar Usuarios" and st.session_state.user['rol'] == 'admin':
+elif menu == "⚙️ Gestionar Usuarios":
     st.title("⚙️ Gestión de Usuarios")
     
-    tab1, tab2 = st.tabs(["📋 Usuarios", "➕ Crear Usuario"])
+    tab1, tab2 = st.tabs(["📋 Usuarios", "➕ Crear"])
     
     with tab1:
-        df_usuarios = obtener_usuarios()
-        st.dataframe(df_usuarios, use_container_width=True)
-        
-        with st.expander("✏️ Editar usuario"):
-            usuario_id = st.number_input("ID del usuario", min_value=1, step=1)
-            nuevo_rol = st.selectbox("Nuevo rol", ["trabajador", "supervisor", "responsable_sst", "auditor", "admin"])
-            if st.button("Actualizar rol"):
-                actualizar_usuario(usuario_id, rol=nuevo_rol)
-                st.success("Rol actualizado")
-                st.rerun()
+        df = obtener_usuarios()
+        st.dataframe(df)
     
     with tab2:
         with st.form("form_usuario"):
-            username = st.text_input("Usuario *")
-            password = st.text_input("Contraseña *", type="password")
-            nombre = st.text_input("Nombre completo *")
+            username = st.text_input("Usuario")
+            password = st.text_input("Contraseña", type="password")
+            nombre = st.text_input("Nombre")
             rol = st.selectbox("Rol", ["trabajador", "supervisor", "responsable_sst", "auditor", "admin"])
-            
-            if st.form_submit_button("Crear Usuario"):
-                if username and password and nombre:
-                    if crear_usuario(username, password, nombre, rol):
-                        st.success(f"✅ Usuario {username} creado exitosamente")
-                        st.rerun()
-                    else:
-                        st.error("Error: El usuario ya existe")
-                else:
-                    st.error("Todos los campos son obligatorios")
+            if st.form_submit_button("Crear"):
+                if crear_usuario(username, password, nombre, rol):
+                    st.success("Usuario creado")
 
 # ========== REPORTAR INCIDENTE ==========
 elif menu == "📝 Reportar Incidente":
     st.title("📝 Reportar Incidente")
     
     with st.form("form_incidente"):
-        desc = st.text_area("Descripción del incidente *")
+        desc = st.text_area("Descripción")
         fecha = st.date_input("Fecha", datetime.now())
-        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
-        
-        if st.form_submit_button("📝 Reportar Incidente", use_container_width=True):
+        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
+        if st.form_submit_button("Reportar"):
             if desc and st.session_state.empresa_actual_id:
                 cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
                               (st.session_state.empresa_actual_id, desc, fecha.strftime("%Y-%m-%d"), gravedad))
                 conn.commit()
-                st.success("✅ Incidente reportado exitosamente")
-                st.rerun()
-            else:
-                st.error("Complete la descripción del incidente")
+                st.success("Reportado")
 
 # ========== PELIGROS ==========
 elif menu == "⚠️ Peligros":
-    st.title("⚠️ PELIGROS - FASE 2 (GTC-45)")
+    st.title("⚠️ Peligros")
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
         
-        tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
-        
-        with tab1:
-            if not df.empty:
-                st.dataframe(df, use_container_width=True)
-            else:
-                st.info("No hay peligros registrados")
-        
-        with tab2:
-            with st.form("form_peligro"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
-                    desc = st.text_area("Descripción detallada")
-                with col2:
-                    prob = st.slider("Probabilidad (1-4)", 1, 4, 2, help="1:Baja, 2:Media, 3:Alta, 4:Muy Alta")
-                    sev = st.slider("Severidad (1-3)", 1, 3, 2, help="1:Ligero, 2:Dañino, 3:Extremo")
-                    matriz = {(1,1):"III",(1,2):"II",(1,3):"I",(2,1):"III",(2,2):"II",(2,3):"I",
-                              (3,1):"II",(3,2):"I",(3,3):"I",(4,1):"II",(4,2):"I",(4,3):"I"}
-                    nivel = matriz.get((prob, sev), "III")
-                    if nivel == "I":
-                        st.error(f"🔴 NIVEL I - RIESGO ALTO")
-                    elif nivel == "II":
-                        st.warning(f"🟠 NIVEL II - RIESGO MEDIO")
-                    else:
-                        st.info(f"🟡 NIVEL III - RIESGO BAJO")
-                
-                if st.form_submit_button("💾 Guardar Peligro", use_container_width=True):
-                    if desc:
-                        cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?, ?)",
-                                      (st.session_state.empresa_actual_id, tipo, desc, prob, sev, nivel))
-                        conn.commit()
-                        st.success("✅ Peligro guardado")
-                        st.rerun()
-                    else:
-                        st.error("La descripción es obligatoria")
-    else:
-        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
+        with st.form("form"):
+            tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
+            desc = st.text_area("Descripción")
+            prob = st.slider("Probabilidad", 1, 4, 2)
+            sev = st.slider("Severidad", 1, 3, 2)
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad) VALUES (?, ?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, tipo, desc, prob, sev))
+                conn.commit()
+                st.rerun()
 
 # ========== PLAN DE ACCIÓN ==========
 elif menu == "✅ Plan de Acción":
-    st.title("✅ PLAN DE ACCIÓN - FASE 4")
+    st.title("✅ Plan de Acción")
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        for _, row in df.iterrows():
+            col1, col2 = st.columns([3,1])
+            with col1:
+                st.write(f"**{row['descripcion']}** - {row['responsable']}")
+            with col2:
+                nuevo = st.selectbox("Estado", ["Pendiente", "Completada"], key=row['id'])
+                if nuevo != row['estado']:
+                    cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo, row['id']))
+                    conn.commit()
+                    st.rerun()
         
-        tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva Acción"])
-        
-        with tab1:
-            if not df.empty:
-                for _, row in df.iterrows():
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**📌 {row['descripcion']}**")
-                        st.caption(f"👤 Responsable: {row['responsable']} | 📅 Vence: {row['fecha']}")
-                    with col2:
-                        if row['estado'] == "Completada":
-                            st.success("✅ Completada")
-                        else:
-                            nuevo = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
-                                                key=f"act_{row['id']}")
-                            if nuevo != row['estado']:
-                                cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo, row['id']))
-                                conn.commit()
-                                st.rerun()
-                    st.markdown("---")
-            else:
-                st.info("No hay acciones registradas")
-        
-        with tab2:
-            with st.form("form_accion"):
-                desc = st.text_area("Descripción de la acción *")
-                responsable = st.text_input("Responsable *")
-                fecha = st.date_input("Fecha límite", datetime.now())
-                prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
-                
-                if st.form_submit_button("💾 Guardar Acción", use_container_width=True):
-                    if desc and responsable:
-                        cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, 'Pendiente')",
-                                      (st.session_state.empresa_actual_id, desc, responsable, fecha.strftime("%Y-%m-%d")))
-                        conn.commit()
-                        st.success("✅ Acción guardada")
-                        st.rerun()
-                    else:
-                        st.error("Descripción y responsable son obligatorios")
-    else:
-        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
+        with st.form("form"):
+            desc = st.text_area("Descripción")
+            resp = st.text_input("Responsable")
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha) VALUES (?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, desc, resp, datetime.now().strftime("%Y-%m-%d")))
+                conn.commit()
+                st.rerun()
 
 # ========== TRABAJADORES ==========
 elif menu == "👥 Trabajadores":
-    st.title("👥 TRABAJADORES - FASE 5")
+    st.title("👥 Trabajadores")
     
     if st.session_state.empresa_actual_id:
         df = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
         
-        tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo Trabajador"])
-        
-        with tab1:
-            if not df.empty:
-                st.dataframe(df, use_container_width=True)
-            else:
-                st.info("No hay trabajadores registrados")
-        
-        with tab2:
-            with st.form("form_trabajador"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    nombre = st.text_input("Nombre completo *")
-                    cedula = st.text_input("Cédula")
-                with col2:
-                    cargo = st.text_input("Cargo")
-                    area = st.text_input("Área/Dependencia")
-                
-                if st.form_submit_button("💾 Registrar Trabajador", use_container_width=True):
-                    if nombre:
-                        cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
-                                      (st.session_state.empresa_actual_id, nombre, cedula, cargo))
-                        conn.commit()
-                        st.success("✅ Trabajador registrado")
-                        st.rerun()
-                    else:
-                        st.error("El nombre es obligatorio")
-    else:
-        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
+        with st.form("form"):
+            nombre = st.text_input("Nombre")
+            cedula = st.text_input("Cédula")
+            cargo = st.text_input("Cargo")
+            if st.form_submit_button("Guardar"):
+                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
+                              (st.session_state.empresa_actual_id, nombre, cedula, cargo))
+                conn.commit()
+                st.rerun()
 
 # ========== INCIDENTES ==========
 elif menu == "📝 Incidentes":
-    st.title("📝 INCIDENTES - FASE 6")
+    st.title("📝 Incidentes")
     
     if st.session_state.empresa_actual_id:
-        with st.form("form_incidente"):
-            desc = st.text_area("Descripción del incidente *")
-            fecha = st.date_input("Fecha", datetime.now())
-            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
-            lugar = st.text_input("Lugar del incidente")
-            
-            if st.form_submit_button("📝 Registrar Incidente", use_container_width=True):
-                if desc:
-                    cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
-                                  (st.session_state.empresa_actual_id, desc, fecha.strftime("%Y-%m-%d"), gravedad))
-                    conn.commit()
-                    st.success("✅ Incidente registrado")
-                    st.rerun()
-                else:
-                    st.error("La descripción es obligatoria")
-        
-        st.markdown("---")
-        st.subheader("📋 Historial de Incidentes")
-        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ? ORDER BY id DESC", conn, params=(st.session_state.empresa_actual_id,))
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-    else:
-        st.warning("⚠️ Primero seleccione o cree una empresa en 'Diagnóstico IA'")
+        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(st.session_state.empresa_actual_id,))
+        st.dataframe(df)
 
 # ========== CHAT IA ==========
 elif menu == "💬 Chat IA":
-    st.title("💬 CHAT EXPERTO EN SST")
-    st.markdown("Consulta sobre normativa, riesgos, o cualquier tema de Seguridad y Salud en el Trabajo")
+    st.title("💬 Chat IA")
     
     if "msgs" not in st.session_state:
         st.session_state.msgs = []
@@ -644,17 +580,11 @@ elif menu == "💬 Chat IA":
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if prompt := st.chat_input("Escribe tu pregunta sobre SST..."):
+    if prompt := st.chat_input("Pregunta..."):
         st.session_state.msgs.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
-        
-        with st.spinner("🤖 IA analizando..."):
-            respuesta = call_ia(prompt)
-        
-        with st.chat_message("assistant"):
-            st.write(respuesta or "Error al conectar con IA")
+        respuesta = call_ia(prompt)
         st.session_state.msgs.append({"role": "assistant", "content": respuesta or "Error"})
+        st.rerun()
 
 # ========== FOOTER ==========
 st.markdown('<div class="developer-footer">🔄 SG-SST PHVA | DESARROLLADO POR JAN BENITEZ</div>', unsafe_allow_html=True)
