@@ -8,157 +8,139 @@ from datetime import datetime
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="centered")
 
-# CSS con distribución corregida
+# CSS para login ultra compacto y centrado
 st.markdown("""
 <style>
-    /* Eliminar padding de Streamlit */
-    .main > div {
-        padding: 0 !important;
-        margin: 0 !important;
+    /* Ocultar header y footer */
+    header, footer {
+        display: none !important;
     }
-    .block-container {
+    
+    /* Eliminar padding del main */
+    .main > div, .block-container {
         padding: 0 !important;
         margin: 0 !important;
         max-width: 100% !important;
     }
+    
+    /* Fondo */
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        height: 100vh;
     }
-    /* Centrado absoluto */
-    .login-wrapper {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+    
+    /* Contenedor flex para centrar verticalmente */
+    .centered-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 999;
+        min-height: 100vh;
+        width: 100%;
     }
+    
+    /* Tarjeta compacta */
     .login-card {
-        background: rgba(20, 20, 40, 0.85);
-        backdrop-filter: blur(15px);
-        border-radius: 28px;
-        padding: 30px 35px;
-        border: 1px solid rgba(255,255,255,0.12);
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-        width: 380px;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 20px 25px;
+        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        width: 320px;
+        margin: 0 auto;
+    }
+    
+    /* Logo */
+    .logo {
         text-align: center;
+        margin-bottom: 10px;
     }
-    .logo-img {
-        width: 65px;
-        display: block;
-        margin: 0 auto 12px auto;
+    .logo img {
+        width: 50px;
     }
-    .app-title {
-        font-size: 24px;
+    .title {
+        text-align: center;
+        font-size: 18px;
         font-weight: 700;
-        background: linear-gradient(135deg, #ffffff, #a8c0ff, #667eea);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0 0 5px 0;
+        color: white;
+        margin: 5px 0;
     }
-    .app-slogan {
-        font-size: 12px;
+    .slogan {
+        text-align: center;
+        font-size: 10px;
         color: rgba(255,255,255,0.6);
-        margin-bottom: 25px;
-        font-style: italic;
+        margin-bottom: 20px;
     }
-    /* Inputs con espacio adecuado */
-    .stTextInput {
-        margin-bottom: 18px !important;
-    }
+    
+    /* Inputs */
     .stTextInput > div > div > input {
-        background: rgba(255,255,255,0.08) !important;
+        background: rgba(255,255,255,0.1) !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
-        border-radius: 12px !important;
+        border-radius: 10px !important;
         color: white !important;
-        padding: 10px 14px !important;
-        font-size: 14px !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        height: 38px !important;
     }
     .stTextInput > div > div > input:focus {
         border-color: #667eea !important;
-        box-shadow: 0 0 0 2px rgba(102,126,234,0.25) !important;
+        outline: none !important;
     }
-    /* Labels */
     label {
-        color: rgba(255,255,255,0.8) !important;
-        font-size: 13px !important;
-        font-weight: 500 !important;
-        text-align: left !important;
-        display: block !important;
-        margin-bottom: 5px !important;
+        color: rgba(255,255,255,0.7) !important;
+        font-size: 12px !important;
+        margin-bottom: 4px !important;
     }
+    
     /* Botón */
-    .stButton {
-        margin-top: 8px !important;
-        margin-bottom: 20px !important;
-    }
     .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
         border: none !important;
-        border-radius: 12px !important;
-        padding: 10px !important;
+        border-radius: 10px !important;
+        padding: 8px !important;
+        font-size: 13px !important;
         font-weight: 600 !important;
-        font-size: 14px !important;
         width: 100% !important;
-        transition: all 0.2s ease;
+        height: 38px !important;
+        margin-top: 5px !important;
     }
     .stButton > button:hover {
         transform: translateY(-1px);
-        box-shadow: 0 8px 20px rgba(102,126,234,0.35);
+        box-shadow: 0 5px 15px rgba(102,126,234,0.4);
     }
-    /* Link olvidó contraseña */
-    .forgot-link {
+    
+    /* Link */
+    .forgot {
         text-align: center;
-        margin: 15px 0 20px 0;
+        margin-top: 12px;
     }
-    .forgot-link button {
-        background: transparent !important;
-        color: rgba(255,255,255,0.55) !important;
-        font-size: 12px !important;
-        padding: 5px !important;
-        box-shadow: none !important;
+    .forgot a {
+        color: rgba(255,255,255,0.5);
+        font-size: 11px;
+        text-decoration: none;
     }
-    .forgot-link button:hover {
-        color: #a8c0ff !important;
-        background: transparent !important;
+    .forgot a:hover {
+        color: #a8c0ff;
     }
+    
     /* Footer */
     .footer {
         text-align: center;
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid rgba(255,255,255,0.08);
-        font-size: 10px;
-        color: rgba(255,255,255,0.35);
+        font-size: 9px;
+        color: rgba(255,255,255,0.3);
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.1);
     }
-    /* Mensajes */
+    
+    /* Mensaje error */
     .stAlert {
         background: rgba(255,0,0,0.15) !important;
         border: none !important;
-        border-radius: 12px !important;
-        padding: 8px !important;
-        font-size: 12px !important;
-        margin-top: 10px !important;
-    }
-    .success-msg {
-        background: rgba(0,255,100,0.1);
-        border: 1px solid rgba(0,255,100,0.25);
-        border-radius: 12px;
-        padding: 10px;
-        text-align: center;
-        color: #00ff88;
-        font-size: 12px;
-        margin-bottom: 15px;
-    }
-    hr {
-        margin: 15px 0;
-        border-color: rgba(255,255,255,0.08);
-    }
-    header {
-        display: none !important;
+        border-radius: 8px !important;
+        font-size: 11px !important;
+        padding: 6px !important;
+        margin-top: 8px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -167,184 +149,78 @@ st.markdown("""
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    nombre TEXT,
-    rol TEXT DEFAULT 'trabajador',
-    email TEXT,
-    activo INTEGER DEFAULT 1
-)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, nombre TEXT, rol TEXT, email TEXT, activo INTEGER DEFAULT 1)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS empresa (id INTEGER PRIMARY KEY AUTOINCREMENT, nit TEXT, nombre TEXT, trabajadores INTEGER, arl TEXT, diagnostico TEXT, fecha TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, tipo TEXT, descripcion TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, responsable TEXT, estado TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, nombre TEXT, cedula TEXT, cargo TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, fecha TEXT, gravedad TEXT)''')
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS empresa (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nit TEXT,
-    nombre TEXT,
-    trabajadores INTEGER,
-    arl TEXT,
-    diagnostico TEXT,
-    fecha TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa_id INTEGER,
-    tipo TEXT,
-    descripcion TEXT,
-    probabilidad INTEGER,
-    severidad INTEGER,
-    nivel TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa_id INTEGER,
-    descripcion TEXT,
-    responsable TEXT,
-    fecha TEXT,
-    estado TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa_id INTEGER,
-    nombre TEXT,
-    cedula TEXT,
-    cargo TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa_id INTEGER,
-    descripcion TEXT,
-    fecha TEXT,
-    gravedad TEXT
-)''')
-
-# Usuario admin
-cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
+cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
 if not cursor.fetchone():
-    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol, email) VALUES (?, ?, ?, ?, ?)",
-                  ('admin', 'admin123', 'Administrador', 'admin', 'admin@sgsst.com'))
+    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol, email) VALUES (?,?,?,?,?)", ('admin','admin123','Administrador','admin','admin@sgsst.com'))
     conn.commit()
-
 conn.commit()
 
-def verificar_login(username, password):
-    cursor.execute("SELECT * FROM usuarios WHERE username = ? AND password = ? AND activo = 1", (username, password))
-    user = cursor.fetchone()
-    if user:
-        return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
+def verificar_login(u, p):
+    cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=? AND activo=1", (u, p))
+    r = cursor.fetchone()
+    if r:
+        return {"nombre": r[3], "rol": r[4]}
     return None
 
-def reset_password(username, email):
-    cursor.execute("SELECT * FROM usuarios WHERE username = ? AND email = ?", (username, email))
-    user = cursor.fetchone()
-    if user:
-        nueva_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        cursor.execute("UPDATE usuarios SET password = ? WHERE id = ?", (nueva_password, user[0]))
-        conn.commit()
-        return True, nueva_password
-    return False, None
-
-def call_ia(prompt):
-    try:
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
-        headers = {"Content-Type": "application/json", "x-goog-api-key": "AIzaSyD3QhEohGJeYhVtM7JmBZ2nXvZJFxJZv3U"}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
-        r = requests.post(url, json=data, headers=headers, timeout=30)
-        if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except:
-        pass
-    return "Error al conectar con IA."
-
-# Sesión
 if "auth" not in st.session_state:
     st.session_state.auth = False
 if "user" not in st.session_state:
     st.session_state.user = None
-if "show_reset" not in st.session_state:
-    st.session_state.show_reset = False
-if "empresa_actual_id" not in st.session_state:
-    st.session_state.empresa_actual_id = None
-if "empresa_actual" not in st.session_state:
-    st.session_state.empresa_actual = None
 
-# ========== LOGIN ==========
 if not st.session_state.auth:
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
+    # Contenedor centrado
+    st.markdown('<div class="centered-container">', unsafe_allow_html=True)
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
     
-    if not st.session_state.show_reset:
-        st.markdown("""
-        <div class="login-card">
-            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img">
-            <div class="app-title">SG-SST PHVA</div>
-            <div class="app-slogan">✨ Seguridad y Salud, compromiso de todos ✨</div>
-        """, unsafe_allow_html=True)
-        
-        with st.form("login_form", clear_on_submit=False):
-            username = st.text_input("📌 Usuario", placeholder="Ingrese su usuario")
-            password = st.text_input("🔒 Contraseña", type="password", placeholder="Ingrese su contraseña")
-            
-            if st.form_submit_button("🚀 INGRESAR", use_container_width=True):
-                user = verificar_login(username, password)
-                if user:
-                    st.session_state.auth = True
-                    st.session_state.user = user
-                    st.rerun()
-                else:
-                    st.error("❌ Usuario o contraseña incorrectos")
-        
-        st.markdown('<div class="forgot-link">', unsafe_allow_html=True)
-        if st.button("🔐 ¿Olvidaste tu contraseña?", use_container_width=True):
-            st.session_state.show_reset = True
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="footer">🛡️ SG-SST PHVA | Desarrollado por JAN BENITEZ</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Logo y título
+    st.markdown("""
+    <div class="logo">
+        <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png">
+    </div>
+    <div class="title">SG-SST PHVA</div>
+    <div class="slogan">Seguridad y Salud, compromiso de todos</div>
+    """, unsafe_allow_html=True)
     
-    else:
-        st.markdown("""
-        <div class="login-card">
-            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" class="logo-img">
-            <div class="app-title">Recuperar Contraseña</div>
-            <div class="app-slogan">✨ Te enviaremos una nueva contraseña ✨</div>
-        """, unsafe_allow_html=True)
+    # Formulario
+    with st.form("login_form"):
+        username = st.text_input("Usuario", placeholder="Ingrese su usuario", key="user_input")
+        password = st.text_input("Contraseña", type="password", placeholder="Ingrese su contraseña", key="pass_input")
         
-        with st.form("reset_form", clear_on_submit=False):
-            username = st.text_input("📌 Usuario", placeholder="Ingrese su usuario")
-            email = st.text_input("✉️ Email", placeholder="Ingrese su email registrado")
-            
-            if st.form_submit_button("📧 ENVIAR NUEVA CONTRASEÑA", use_container_width=True):
-                success, new_pass = reset_password(username, email)
-                if success:
-                    st.markdown(f'<div class="success-msg">✅ Contraseña restablecida: <strong>{new_pass}</strong><br>Guárdala e inicia sesión</div>', unsafe_allow_html=True)
-                else:
-                    st.error("❌ Usuario o email no encontrados")
-        
-        st.markdown('<div class="forgot-link">', unsafe_allow_html=True)
-        if st.button("← Volver al inicio de sesión", use_container_width=True):
-            st.session_state.show_reset = False
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="footer">🛡️ SG-SST PHVA | Desarrollado por JAN BENITEZ</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        if st.form_submit_button("🚀 INGRESAR", use_container_width=True):
+            user = verificar_login(username, password)
+            if user:
+                st.session_state.auth = True
+                st.session_state.user = user
+                st.rerun()
+            else:
+                st.error("❌ Usuario o contraseña incorrectos")
     
+    # Link olvidó contraseña
+    st.markdown('<div class="forgot"><a href="#">🔐 ¿Olvidaste tu contraseña?</a></div>', unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown('<div class="footer">🛡️ SG-SST PHVA | Desarrollado por JAN BENITEZ</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# ========== DASHBOARD ==========
+# ========== DASHBOARD POST LOGIN ==========
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
 st.success(f"✅ Bienvenido {st.session_state.user['nombre']}")
 
-if st.button("🚪 Cerrar Sesión"):
-    st.session_state.auth = False
-    st.session_state.show_reset = False
-    st.rerun()
+col1, col2 = st.columns([3, 1])
+with col2:
+    if st.button("🚪 Cerrar Sesión", use_container_width=True):
+        st.session_state.auth = False
+        st.rerun()
 
-st.info("📌 Módulos disponibles: Dashboard, Diagnóstico IA, Peligros, Plan de Acción, Trabajadores, Incidentes, Chat IA")
+st.info("📌 Módulos: Dashboard | Diagnóstico IA | Peligros | Plan de Acción | Trabajadores | Incidentes | Chat IA")
