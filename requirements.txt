@@ -4,3 +4,5 @@ pandas
 openpyxl
 google-generativeai
 groq
+python-docx
+fpdf
