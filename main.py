@@ -24,11 +24,13 @@ st.markdown("""
         border-radius: 12px !important;
         font-weight: 600 !important;
     }
-    .css-1d391kg {
-        background: rgba(20,20,40,0.5);
-    }
     .stSelectbox, .stTextInput, .stNumberInput {
         margin-bottom: 10px;
+    }
+    /* Sidebar más elegante */
+    [data-testid="stSidebar"] {
+        background: rgba(20, 20, 40, 0.5);
+        backdrop-filter: blur(10px);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -98,12 +100,15 @@ if not cursor.fetchone():
                   ('admin', 'admin123', 'Administrador', 'admin'))
     conn.commit()
 
-# Insertar datos demo si no hay peligros
+# Insertar datos demo
 cursor.execute("SELECT COUNT(*) FROM peligros")
 if cursor.fetchone()[0] == 0:
-    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Físico', 'Ruido excesivo', 2, 2, 'II')")
-    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Realizar matriz de riesgos', 'SST', '2024-12-31', 'Pendiente')")
+    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Físico', 'Ruido excesivo en planta', 2, 2, 'II')")
+    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Ergonómico', 'Posturas inadecuadas', 3, 2, 'II')")
+    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Realizar matriz de riesgos', 'Coordinador SST', '2024-12-31', 'Pendiente')")
+    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Capacitación en prevención', 'SST', '2024-11-30', 'En progreso')")
     cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1, 'Juan Pérez', '12345678', 'Operario')")
+    cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1, 'María Gómez', '87654321', 'Supervisora')")
     conn.commit()
 
 conn.commit()
@@ -166,22 +171,29 @@ if not st.session_state.auth:
         """, unsafe_allow_html=True)
     st.stop()
 
-# ========== SIDEBAR ==========
+# ========== SIDEBAR CON MODULOS FIJOS ==========
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=45)
     st.markdown(f"**👤 {st.session_state.user['nombre']}**")
     st.markdown(f"**Rol:** {st.session_state.user['rol'].upper()}")
     st.markdown("---")
     
-    menu = st.selectbox("📋 MENU PRINCIPAL", [
-        "📊 Dashboard",
-        "🤖 Diagnóstico IA",
-        "⚠️ Peligros",
-        "✅ Plan de Acción",
-        "👥 Trabajadores",
-        "📝 Incidentes",
-        "💬 Chat IA"
-    ])
+    # Módulos fijos visibles siempre
+    st.markdown("### 📋 MÓDULOS")
+    
+    menu = st.radio(
+        "Seleccione un módulo:",
+        [
+            "📊 Dashboard",
+            "🤖 Diagnóstico IA",
+            "⚠️ Peligros",
+            "✅ Plan de Acción",
+            "👥 Trabajadores",
+            "📝 Incidentes",
+            "💬 Chat IA"
+        ],
+        label_visibility="collapsed"
+    )
     
     st.markdown("---")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
@@ -209,11 +221,22 @@ if menu == "📊 Dashboard":
         st.metric("📝 Incidentes", len(df_incidentes))
     
     st.markdown("---")
-    st.subheader("📋 Últimas acciones")
-    if not df_acciones.empty:
-        st.dataframe(df_acciones, use_container_width=True)
-    else:
-        st.info("No hay acciones registradas")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("⚠️ Peligros registrados")
+        if not df_peligros.empty:
+            st.dataframe(df_peligros[['tipo', 'descripcion', 'nivel']], use_container_width=True)
+        else:
+            st.info("No hay peligros")
+    
+    with col2:
+        st.subheader("✅ Acciones pendientes")
+        if not df_acciones.empty:
+            pendientes = df_acciones[df_acciones['estado'] != 'Completada']
+            st.dataframe(pendientes[['descripcion', 'responsable', 'estado']], use_container_width=True)
+        else:
+            st.info("No hay acciones")
 
 # ========== DIAGNÓSTICO IA ==========
 elif menu == "🤖 Diagnóstico IA":
@@ -251,155 +274,204 @@ elif menu == "🤖 Diagnóstico IA":
 elif menu == "⚠️ Peligros":
     st.title("⚠️ PELIGROS - FASE 2 GTC-45")
     
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
+    tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
     
     with tab1:
         df = pd.read_sql_query("SELECT * FROM peligros", conn)
         if not df.empty:
             st.dataframe(df, use_container_width=True)
+            
+            # Botón para eliminar
+            with st.expander("🗑️ Eliminar peligro"):
+                id_eliminar = st.number_input("ID del peligro a eliminar", min_value=1, step=1)
+                if st.button("Eliminar"):
+                    cursor.execute("DELETE FROM peligros WHERE id = ?", (id_eliminar,))
+                    conn.commit()
+                    st.success("✅ Eliminado")
+                    st.rerun()
         else:
             st.info("No hay peligros registrados")
     
     with tab2:
         with st.form("form_peligro"):
-            tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
-            descripcion = st.text_area("Descripción")
-            probabilidad = st.slider("Probabilidad (1-4)", 1, 4, 2)
-            severidad = st.slider("Severidad (1-3)", 1, 3, 2)
+            tipo = st.selectbox("Tipo de Peligro", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
+            descripcion = st.text_area("Descripción detallada")
+            probabilidad = st.slider("Probabilidad (1-4)", 1, 4, 2, help="1:Baja, 2:Media, 3:Alta, 4:Muy Alta")
+            severidad = st.slider("Severidad (1-3)", 1, 3, 2, help="1:Ligero, 2:Dañino, 3:Extremo")
             
+            # Calcular nivel de riesgo
             matriz = {(1,1):"III",(1,2):"II",(1,3):"I",(2,1):"III",(2,2):"II",(2,3):"I",
                       (3,1):"II",(3,2):"I",(3,3):"I",(4,1):"II",(4,2):"I",(4,3):"I"}
             nivel = matriz.get((probabilidad, severidad), "III")
             
             if nivel == "I":
-                st.error("🔴 NIVEL I - RIESGO ALTO")
+                st.error("🔴 NIVEL I - RIESGO ALTO - Requiere intervención inmediata")
             elif nivel == "II":
-                st.warning("🟠 NIVEL II - RIESGO MEDIO")
+                st.warning("🟠 NIVEL II - RIESGO MEDIO - Requiere seguimiento")
             else:
-                st.info("🟡 NIVEL III - RIESGO BAJO")
+                st.info("🟡 NIVEL III - RIESGO BAJO - Monitorear")
             
-            if st.form_submit_button("💾 Guardar"):
-                cursor.execute('''INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) 
-                                  VALUES (?, ?, ?, ?, ?, ?)''',
-                              (1, tipo, descripcion, probabilidad, severidad, nivel))
-                conn.commit()
-                st.success("✅ Guardado")
-                st.rerun()
+            if st.form_submit_button("💾 Guardar Peligro", use_container_width=True):
+                if descripcion:
+                    cursor.execute('''INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) 
+                                      VALUES (?, ?, ?, ?, ?, ?)''',
+                                  (1, tipo, descripcion, probabilidad, severidad, nivel))
+                    conn.commit()
+                    st.success("✅ Peligro guardado")
+                    st.rerun()
+                else:
+                    st.error("Ingrese una descripción")
 
 # ========== PLAN DE ACCIÓN ==========
 elif menu == "✅ Plan de Acción":
-    st.title("✅ PLAN DE ACCIÓN")
+    st.title("✅ PLAN DE ACCIÓN - FASE 4")
     
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nueva"])
+    tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva Acción"])
     
     with tab1:
         df = pd.read_sql_query("SELECT * FROM acciones", conn)
         if not df.empty:
             for _, row in df.iterrows():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"**{row['descripcion']}**")
-                    st.caption(f"Responsable: {row['responsable']} | Estado: {row['estado']}")
-                with col2:
-                    nuevo = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
-                                        index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
-                                        key=f"estado_{row['id']}")
-                    if nuevo != row['estado']:
-                        cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo, row['id']))
-                        conn.commit()
-                        st.rerun()
-                st.markdown("---")
+                with st.container():
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"**📌 {row['descripcion']}**")
+                        st.caption(f"👤 {row['responsable']} | 📅 {row['fecha']}")
+                        if row['estado'] == "Completada":
+                            st.success("✅ Completada")
+                        elif row['estado'] == "En progreso":
+                            st.warning("⏳ En progreso")
+                        else:
+                            st.info("📋 Pendiente")
+                    with col2:
+                        nuevo_estado = st.selectbox(
+                            "Estado", 
+                            ["Pendiente", "En progreso", "Completada"], 
+                            index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
+                            key=f"estado_{row['id']}"
+                        )
+                        if nuevo_estado != row['estado']:
+                            cursor.execute("UPDATE acciones SET estado = ? WHERE id = ?", (nuevo_estado, row['id']))
+                            conn.commit()
+                            st.rerun()
+                    st.markdown("---")
         else:
-            st.info("No hay acciones")
+            st.info("📭 No hay acciones registradas")
     
     with tab2:
         with st.form("form_accion"):
-            descripcion = st.text_area("Descripción")
+            descripcion = st.text_area("Descripción de la acción")
             responsable = st.text_input("Responsable")
             fecha_limite = st.date_input("Fecha límite", datetime.now())
-            if st.form_submit_button("Guardar"):
+            prioridad = st.selectbox("Prioridad", ["Alta", "Media", "Baja"])
+            
+            if st.form_submit_button("💾 Guardar Acción", use_container_width=True):
                 if descripcion and responsable:
                     cursor.execute('''INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) 
                                       VALUES (?, ?, ?, ?, ?)''',
                                   (1, descripcion, responsable, fecha_limite.strftime("%Y-%m-%d"), "Pendiente"))
                     conn.commit()
-                    st.success("✅ Guardado")
+                    st.success("✅ Acción guardada")
                     st.rerun()
+                else:
+                    st.error("Complete todos los campos")
 
 # ========== TRABAJADORES ==========
 elif menu == "👥 Trabajadores":
-    st.title("👥 TRABAJADORES")
+    st.title("👥 GESTIÓN DE TRABAJADORES")
     
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
+    tab1, tab2 = st.tabs(["📋 Lista de Trabajadores", "➕ Nuevo Trabajador"])
     
     with tab1:
         df = pd.read_sql_query("SELECT * FROM trabajadores", conn)
         if not df.empty:
             st.dataframe(df, use_container_width=True)
         else:
-            st.info("No hay trabajadores")
+            st.info("📭 No hay trabajadores registrados")
     
     with tab2:
         with st.form("form_trabajador"):
-            nombre = st.text_input("Nombre completo")
-            cedula = st.text_input("Cédula")
-            cargo = st.text_input("Cargo")
-            if st.form_submit_button("Registrar"):
+            col1, col2 = st.columns(2)
+            with col1:
+                nombre = st.text_input("Nombre completo")
+                cedula = st.text_input("Cédula")
+            with col2:
+                cargo = st.text_input("Cargo")
+                area = st.text_input("Área/Dependencia")
+            
+            if st.form_submit_button("💾 Registrar Trabajador", use_container_width=True):
                 if nombre:
                     cursor.execute('''INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) 
                                       VALUES (?, ?, ?, ?)''', (1, nombre, cedula, cargo))
                     conn.commit()
-                    st.success("✅ Registrado")
+                    st.success("✅ Trabajador registrado")
                     st.rerun()
+                else:
+                    st.error("Ingrese el nombre del trabajador")
 
 # ========== INCIDENTES ==========
 elif menu == "📝 Incidentes":
-    st.title("📝 INCIDENTES")
+    st.title("📝 REGISTRO DE INCIDENTES")
     
-    tab1, tab2 = st.tabs(["📋 Historial", "➕ Reportar"])
+    col1, col2 = st.columns([1, 1])
     
-    with tab1:
-        df = pd.read_sql_query("SELECT * FROM incidentes ORDER BY fecha DESC", conn)
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("No hay incidentes")
-    
-    with tab2:
+    with col1:
         with st.form("form_incidente"):
+            st.subheader("➕ Nuevo Incidente")
             descripcion = st.text_area("Descripción del incidente")
-            fecha = st.date_input("Fecha", datetime.now())
+            fecha = st.date_input("Fecha del incidente", datetime.now())
             gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
-            if st.form_submit_button("Reportar"):
+            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Enfermedad Laboral", "Casi accidente"])
+            
+            if st.form_submit_button("📝 Reportar Incidente", use_container_width=True):
                 if descripcion:
                     cursor.execute('''INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) 
                                       VALUES (?, ?, ?, ?)''', (1, descripcion, fecha.strftime("%Y-%m-%d"), gravedad))
                     conn.commit()
-                    st.success("✅ Reportado")
+                    st.success("✅ Incidente reportado")
                     st.rerun()
+                else:
+                    st.error("Ingrese una descripción")
+    
+    with col2:
+        st.subheader("📊 Estadísticas")
+        df = pd.read_sql_query("SELECT * FROM incidentes", conn)
+        if not df.empty:
+            st.metric("Total Incidentes", len(df))
+            st.metric("Graves", len(df[df['gravedad'] == 'Grave']) if 'gravedad' in df.columns else 0)
+        else:
+            st.info("Sin datos")
+    
+    st.markdown("---")
+    st.subheader("📋 Historial de Incidentes")
+    df = pd.read_sql_query("SELECT * FROM incidentes ORDER BY fecha DESC", conn)
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
 
 # ========== CHAT IA ==========
 elif menu == "💬 Chat IA":
-    st.title("💬 CHAT IA")
+    st.title("💬 CHAT IA - Asistente SST")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {"role": "assistant", "content": "¡Hola! Soy tu asistente SST. ¿En qué puedo ayudarte hoy?"}
+        ]
     
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if prompt := st.chat_input("Pregunta sobre SST..."):
+    if prompt := st.chat_input("Pregunta sobre SST, peligros, normativas..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("🤖 Pensando..."):
+            with st.spinner("🤖 Analizando tu consulta..."):
                 respuesta = call_ia(prompt)
                 st.write(respuesta)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
 # Footer
 st.markdown("---")
-st.markdown("<p style='text-align:center; font-size:11px; color:gray'>🔄 SG-SST PHVA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; font-size:11px; color:gray'>🔄 SG-SST PHVA | Sistema de Gestión PHVA con IA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
