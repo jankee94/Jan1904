@@ -187,7 +187,7 @@ with st.sidebar:
     
     menu = st.radio(
         "📋 MÓDULOS",
-        ["📊 Dashboard", "🤖 Diagnóstico IA", "⚠️ Peligros", "✅ Plan de Acción", "👥 Trabajadores", "📝 Incidentes", "💬 Chat IA"],
+        ["📊 Dashboard", "⚡ Diagnóstico Rápido", "🏢 Configuración Empresa", "📊 Informes", "⚠️ Peligros", "✅ Plan de Acción", "👥 Trabajadores", "📝 Incidentes", "📋 Matriz Legal", "🔍 Auditorías", "📅 Plan Anual", "💬 Chat IA"],
         label_visibility="collapsed"
     )
     
