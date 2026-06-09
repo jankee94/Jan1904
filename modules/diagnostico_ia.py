@@ -1,68 +1,57 @@
-﻿import streamlit as st
-from datetime import datetime, timedelta
-from core.db import db
-from core.ia_engine import ia
+import streamlit as st
+import sqlite3
+import requests
+from datetime import datetime
 
 def render():
     st.title("🤖 DIAGNÓSTICO IA")
     
-    empresa = db.obtener_empresa()
+    conn = sqlite3.connect("sst.db", check_same_thread=False)
+    cursor = conn.cursor()
     
-    if empresa:
-        st.success(f"✅ Empresa: {empresa.get('nombre', '')}")
-        st.info(f"👥 {empresa.get('trabajadores', 0)} trabajadores | ARL: {empresa.get('arl', '')}")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("⚠️ Peligros"):
-                st.session_state.page = "Peligros"
-                st.rerun()
-        with col2:
-            if st.button("👥 Trabajadores"):
-                st.session_state.page = "Trabajadores"
-                st.rerun()
-        with col3:
-            if st.button("✅ Plan Acción"):
-                st.session_state.page = "Plan de Acción"
-                st.rerun()
-        with col4:
-            if st.button("📝 Incidentes"):
-                st.session_state.page = "Incidentes"
-                st.rerun()
-        
-        with st.expander("Ver diagnóstico completo"):
-            st.markdown(empresa.get('diagnostico_ia', ''))
-        return
+    def call_ia(prompt):
+        try:
+            url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
+            headers = {"Content-Type": "application/json", "x-goog-api-key": "AIzaSyD3QhEohGJeYhVtM7JmBZ2nXvZJFxJZv3U"}
+            data = {"contents": [{"parts": [{"text": prompt}]}]}
+            r = requests.post(url, json=data, headers=headers, timeout=30)
+            if r.status_code == 200:
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        except:
+            pass
+        return "⚠️ IA no disponible. Usando modo offline."
     
-    with st.form("form_diagnostico"):
-        nombre = st.text_input("Nombre empresa *")
-        trabajadores = st.number_input("Trabajadores", min_value=1, value=10)
-        arl = st.selectbox("ARL", ["Positiva", "Sura", "Colpatria"])
+    with st.form("diagnostico_form"):
+        nombre = st.text_input("Nombre de la empresa")
+        trabajadores = st.number_input("Número de trabajadores", min_value=1, value=10)
+        arl = st.selectbox("ARL", ["Positiva", "Sura", "Colpatria", "Bolivar"])
         
-        if st.form_submit_button("Generar Diagnóstico"):
+        if st.form_submit_button("🚀 Generar Diagnóstico", use_container_width=True):
             if nombre:
-                with st.spinner("IA generando..."):
-                    prompt = f"Diagnóstico SST para {nombre} con {trabajadores} trabajadores, ARL {arl}"
-                    respuesta = ia.call_best(prompt)
+                with st.spinner("🤖 IA generando diagnóstico..."):
+                    prompt = f"Realiza un diagnóstico SST para la empresa {nombre} con {trabajadores} trabajadores y ARL {arl}. Incluye recomendaciones iniciales."
+                    respuesta = call_ia(prompt)
                     
-                    if respuesta:
-                        db.guardar_empresa("", nombre, trabajadores, arl, "", respuesta)
-                        
-                        peligros = [
-                            ("Ergonómico", f"Posturas inadecuadas en {nombre}", "Oficinas", 2, 2),
-                            ("Seguridad", "Caídas al mismo nivel", "Todas", 2, 2),
-                            ("Psicosocial", "Estrés laboral", "Administrativo", 2, 2),
-                        ]
-                        for p in peligros:
-                            db.guardar_peligro(p[0], p[1], p[2], p[3], p[4], 1)
-                        
-                        fecha = datetime.now()
-                        acciones = [
-                            (f"Matriz de riesgos para {nombre}", "SST", (fecha + timedelta(days=30)).strftime("%Y-%m-%d"), "Alta"),
-                            ("Capacitación en prevención", "SST", (fecha + timedelta(days=45)).strftime("%Y-%m-%d"), "Alta"),
-                        ]
-                        for a in acciones:
-                            db.guardar_accion(0, a[0], a[1], a[2], a[3], 1)
-                        
-                        st.success("✅ Diagnóstico generado")
-                        st.rerun()
+                    # Guardar en base de datos
+                    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    cursor.execute('''INSERT INTO empresa (nombre, trabajadores, arl, diagnostico, fecha) 
+                                      VALUES (?, ?, ?, ?, ?)''', (nombre, trabajadores, arl, respuesta, fecha))
+                    conn.commit()
+                    empresa_id = cursor.lastrowid
+                    st.session_state.empresa_actual_id = empresa_id
+                    
+                    st.success("✅ Diagnóstico generado exitosamente")
+                    st.markdown(respuesta)
+            else:
+                st.error("Por favor ingrese el nombre de la empresa")
+    
+    # Mostrar diagnósticos anteriores
+    st.markdown("---")
+    st.subheader("📋 Diagnósticos anteriores")
+    df = pd.read_sql_query("SELECT id, nombre, trabajadores, arl, fecha FROM empresa ORDER BY id DESC", conn)
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("No hay diagnósticos previos")
+    
+    conn.close()
