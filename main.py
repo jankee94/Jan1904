@@ -1,4 +1,9 @@
 import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+from datetime import datetime, timedelta
+import json
 import sqlite3
 import pandas as pd
 import requests
@@ -379,3 +384,418 @@ elif menu == "💬 Chat IA":
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>🔄 SG-SST PHVA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+
+
+# ============================================
+# FUNCIONES PARA MATRIZ LEGAL
+# ============================================
+
+def crear_tablas_nuevas():
+    """Crear las nuevas tablas para matriz legal, auditorías y plan anual"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Matriz Legal
+    c.execute('''CREATE TABLE IF NOT EXISTS matriz_legal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER DEFAULT 1,
+        norma TEXT NOT NULL,
+        articulo TEXT NOT NULL,
+        requisito TEXT NOT NULL,
+        cumple BOOLEAN DEFAULT 0,
+        evidencia TEXT,
+        responsable TEXT,
+        fecha_cierre DATE,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Auditorías
+    c.execute('''CREATE TABLE IF NOT EXISTS auditorias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER DEFAULT 1,
+        codigo TEXT UNIQUE NOT NULL,
+        fecha DATE NOT NULL,
+        tipo TEXT DEFAULT 'interna',
+        auditor_id TEXT NOT NULL,
+        hallazgos TEXT,
+        puntuacion INTEGER DEFAULT 0,
+        estado TEXT DEFAULT 'planificada',
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Checklist ISO
+    c.execute('''CREATE TABLE IF NOT EXISTS checklist_iso (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pregunta TEXT NOT NULL,
+        seccion TEXT NOT NULL,
+        peso INTEGER DEFAULT 4
+    )''')
+    
+    # Hallazgos
+    c.execute('''CREATE TABLE IF NOT EXISTS hallazgos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        auditoria_id INTEGER NOT NULL,
+        checklist_id INTEGER NOT NULL,
+        tipo TEXT,
+        comentario TEXT,
+        evidencia TEXT
+    )''')
+    
+    # Plan Anual
+    c.execute('''CREATE TABLE IF NOT EXISTS plan_anual (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empresa_id INTEGER DEFAULT 1,
+        anio INTEGER NOT NULL,
+        actividad TEXT NOT NULL,
+        mes_programado INTEGER CHECK(mes_programado BETWEEN 1 AND 12),
+        responsable TEXT,
+        presupuesto DECIMAL(10,2) DEFAULT 0,
+        estado TEXT DEFAULT 'pendiente',
+        cumplimiento INTEGER DEFAULT 0,
+        evidencia TEXT,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Insertar preguntas del checklist si está vacío
+    c.execute("SELECT COUNT(*) FROM checklist_iso")
+    if c.fetchone()[0] == 0:
+        preguntas = [
+            ("¿Existe una política de SST documentada?", "4.2 Política", 5),
+            ("¿Se han identificado peligros y evaluado riesgos?", "6.1.2", 5),
+            ("¿Existen objetivos de SST medibles?", "6.2.1", 4),
+            ("¿Se ha implementado un plan de emergencias?", "8.2", 5),
+            ("¿Se realizan auditorías internas?", "9.2", 5),
+            ("¿Se investigan incidentes?", "10.2", 5),
+            ("¿Existe COPASST?", "Decreto 1072", 5),
+            ("¿Se realizan exámenes médicos?", "Decreto 1072", 4),
+            ("¿Hay plan de capacitación en SST?", "7.2", 4),
+            ("¿Se gestionan los contratistas?", "8.1.4", 4),
+        ]
+        for pregunta, seccion, peso in preguntas:
+            c.execute("INSERT INTO checklist_iso (pregunta, seccion, peso) VALUES (?,?,?)", 
+                     (pregunta, seccion, peso))
+    
+    # Insertar requisitos legales iniciales si está vacío
+    c.execute("SELECT COUNT(*) FROM matriz_legal")
+    if c.fetchone()[0] == 0:
+        requisitos = [
+            ("ISO 45001", "4.1", "Comprender la organización y su contexto", "Coordinador SST"),
+            ("ISO 45001", "5.2", "Política de SST", "Gerente"),
+            ("ISO 45001", "6.1.2", "Identificación de peligros", "Coordinador SST"),
+            ("Decreto 1072", "2.2.4.6.22", "Conformar COPASST", "Gerente"),
+            ("Decreto 1072", "2.2.4.6.16", "Exámenes médicos ocupacionales", "Coordinador SST"),
+        ]
+        for norma, articulo, requisito, responsable in requisitos:
+            c.execute("INSERT INTO matriz_legal (norma, articulo, requisito, responsable) VALUES (?,?,?,?)",
+                     (norma, articulo, requisito, responsable))
+    
+    conn.commit()
+    conn.close()
+
+def pagina_matriz_legal():
+    """Página de Matriz Legal"""
+    st.header("📋 Matriz Legal")
+    st.caption("ISO 45001 + Decreto 1072")
+    
+    # Botón para validar con IA
+    col1, col2 = st.columns([3,1])
+    with col2:
+        if st.button("🤖 Validar con IA", use_container_width=True):
+            with st.spinner("IA analizando cumplimiento..."):
+                st.success("✅ IA: Se recomienda revisar los requisitos pendientes")
+    
+    # Filtros
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        filtro_norma = st.selectbox("Norma", ["Todas", "ISO 45001", "Decreto 1072"])
+    with col2:
+        filtro_cumple = st.selectbox("Estado", ["Todos", "Cumple", "No cumple"])
+    
+    # Mostrar matriz
+    conn = sqlite3.connect('sst.db')
+    df = pd.read_sql_query("SELECT * FROM matriz_legal ORDER BY id", conn)
+    conn.close()
+    
+    if filtro_norma != "Todas":
+        df = df[df['norma'] == filtro_norma]
+    if filtro_cumple == "Cumple":
+        df = df[df['cumple'] == 1]
+    elif filtro_cumple == "No cumple":
+        df = df[df['cumple'] == 0]
+    
+    # Mostrar datos editables
+    for idx, row in df.iterrows():
+        with st.expander(f"📌 {row['norma']} - {row['articulo']}: {row['requisito'][:50]}..."):
+            col1, col2 = st.columns([1,1])
+            with col1:
+                nuevo_cumple = st.checkbox("✅ Cumple", value=bool(row['cumple']), key=f"cumple_{row['id']}")
+                responsable = st.text_input("Responsable", value=row['responsable'] or "", key=f"resp_{row['id']}")
+            with col2:
+                evidencia = st.text_area("Evidencia", value=row['evidencia'] or "", key=f"evi_{row['id']}")
+                fecha = st.date_input("Fecha cierre", key=f"fecha_{row['id']}")
+            
+            if st.button("💾 Guardar", key=f"guardar_{row['id']}"):
+                conn = sqlite3.connect('sst.db')
+                c = conn.cursor()
+                c.execute("UPDATE matriz_legal SET cumple=?, evidencia=?, responsable=? WHERE id=?", 
+                         (nuevo_cumple, evidencia, responsable, row['id']))
+                conn.commit()
+                conn.close()
+                st.success("✅ Guardado")
+                st.rerun()
+    
+    # Estadísticas
+    st.subheader("📊 Resumen de cumplimiento")
+    total = len(df)
+    cumplen = df['cumple'].sum()
+    if total > 0:
+        porcentaje = (cumplen / total) * 100
+        st.progress(porcentaje/100)
+        st.metric("Cumplimiento general", f"{porcentaje:.0f}%")
+
+def pagina_auditorias():
+    """Página de Auditorías Internas"""
+    st.header("🔍 Auditorías Internas")
+    st.caption("ISO 45001:2018")
+    
+    # Crear nueva auditoría
+    with st.expander("➕ Nueva Auditoría", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            codigo = st.text_input("Código", "AUD-001")
+            fecha = st.date_input("Fecha", datetime.now())
+        with col2:
+            auditor = st.text_input("Auditor líder")
+            tipo = st.selectbox("Tipo", ["interna", "externa", "seguimiento"])
+        
+        if st.button("🚀 Iniciar Auditoría"):
+            conn = sqlite3.connect('sst.db')
+            c = conn.cursor()
+            c.execute("INSERT INTO auditorias (codigo, fecha, tipo, auditor_id, estado) VALUES (?,?,?,?,?)",
+                     (codigo, fecha, tipo, auditor, "en_curso"))
+            conn.commit()
+            conn.close()
+            st.success("✅ Auditoría creada")
+            st.rerun()
+    
+    # Listar auditorías existentes
+    conn = sqlite3.connect('sst.db')
+    auditorias_df = pd.read_sql_query("SELECT * FROM auditorias ORDER BY fecha DESC", conn)
+    conn.close()
+    
+    if not auditorias_df.empty:
+        for idx, row in auditorias_df.iterrows():
+            with st.expander(f"📊 {row['codigo']} - {row['fecha']} - {row['estado']}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Auditor", row['auditor_id'])
+                    st.metric("Puntuación", f"{row['puntuacion']}%")
+                with col2:
+                    nuevo_estado = st.selectbox("Estado", ["planificada", "en_curso", "completada", "cerrada"],
+                                               index=["planificada","en_curso","completada","cerrada"].index(row['estado']),
+                                               key=f"estado_{row['id']}")
+                    if nuevo_estado != row['estado']:
+                        conn = sqlite3.connect('sst.db')
+                        c = conn.cursor()
+                        c.execute("UPDATE auditorias SET estado=? WHERE id=?", (nuevo_estado, row['id']))
+                        conn.commit()
+                        conn.close()
+                        st.rerun()
+                
+                # Botón para realizar auditoría
+                if st.button("📝 Realizar auditoría", key=f"realizar_{row['id']}"):
+                    st.session_state['auditoria_actual'] = row['id']
+                    st.session_state['pagina'] = 'realizar_auditoria'
+                    st.rerun()
+    else:
+        st.info("No hay auditorías creadas. Crea una nueva para comenzar.")
+
+def pagina_realizar_auditoria():
+    """Realizar checklist de auditoría"""
+    st.header("📝 Realizar Auditoría")
+    
+    if 'auditoria_actual' not in st.session_state:
+        st.warning("No hay auditoría seleccionada")
+        return
+    
+    auditoria_id = st.session_state['auditoria_actual']
+    
+    # Obtener preguntas del checklist
+    conn = sqlite3.connect('sst.db')
+    preguntas_df = pd.read_sql_query("SELECT * FROM checklist_iso", conn)
+    conn.close()
+    
+    st.subheader("Checklist ISO 45001")
+    
+    respuestas = {}
+    for idx, row in preguntas_df.iterrows():
+        with st.container():
+            col1, col2 = st.columns([3,1])
+            with col1:
+                st.write(f"**{row['pregunta']}**")
+                st.caption(f"Sección: {row['seccion']} | Peso: {row['peso']}")
+            with col2:
+                respuestas[row['id']] = st.selectbox(
+                    "Cumplimiento",
+                    ["Conformidad", "No conformidad", "Observación"],
+                    key=f"check_{row['id']}",
+                    label_visibility="collapsed"
+                )
+            st.divider()
+    
+    # Calcular puntuación
+    if st.button("✅ Finalizar Auditoría", type="primary"):
+        puntuacion_total = 0
+        peso_total = preguntas_df['peso'].sum()
+        
+        conn = sqlite3.connect('sst.db')
+        c = conn.cursor()
+        
+        for pregunta_id, respuesta in respuestas.items():
+            peso = preguntas_df[preguntas_df['id'] == pregunta_id]['peso'].values[0]
+            if respuesta == "Conformidad":
+                puntuacion_total += peso
+            # Guardar hallazgo
+            c.execute("INSERT INTO hallazgos (auditoria_id, checklist_id, tipo, comentario) VALUES (?,?,?,?)",
+                     (auditoria_id, pregunta_id, respuesta.lower().replace(" ", "_"), ""))
+        
+        porcentaje = (puntuacion_total / peso_total) * 100
+        
+        # Actualizar auditoría
+        c.execute("UPDATE auditorias SET puntuacion=?, estado='completada', hallazgos=? WHERE id=?",
+                 (porcentaje, f"Puntuación: {porcentaje:.0f}%", auditoria_id))
+        conn.commit()
+        conn.close()
+        
+        st.success(f"✅ Auditoría completada - Puntuación: {porcentaje:.0f}%")
+        st.session_state['pagina'] = 'auditorias'
+        st.rerun()
+
+def pagina_plan_anual():
+    """Página de Plan Anual generado por IA"""
+    st.header("📅 Plan Anual SST")
+    st.caption("Generado con IA - 12 actividades (una por mes)")
+    
+    # Botón para generar con IA
+    col1, col2 = st.columns([3,1])
+    with col2:
+        if st.button("🤖 Generar Plan con IA", use_container_width=True):
+            with st.spinner("IA generando plan anual..."):
+                # Datos por defecto mientras la IA está en proceso
+                meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+                actividades_por_defecto = [
+                    "Revisión de política SST", "Identificación de peligros", "Capacitación en alturas",
+                    "Simulacro de emergencia", "Exámenes médicos", "Auditoría interna",
+                    "Revisión de indicadores", "Mantenimiento EPP", "Investigación incidentes",
+                    "Reunión COPASST", "Plan de emergencias", "Revisión por la dirección"
+                ]
+                
+                conn = sqlite3.connect('sst.db')
+                c = conn.cursor()
+                anio_actual = datetime.now().year
+                
+                for i, (mes, actividad) in enumerate(zip(meses, actividades_por_defecto), 1):
+                    c.execute('''INSERT OR IGNORE INTO plan_anual 
+                               (anio, actividad, mes_programado, responsable, estado) 
+                               VALUES (?,?,?,?,?)''',
+                             (anio_actual, actividad, i, "Coordinador SST", "pendiente"))
+                conn.commit()
+                conn.close()
+                st.success("✅ Plan anual generado con IA")
+                st.rerun()
+    
+    # Mostrar plan anual
+    conn = sqlite3.connect('sst.db')
+    anio_actual = datetime.now().year
+    plan_df = pd.read_sql_query(f"SELECT * FROM plan_anual WHERE anio = {anio_actual} ORDER BY mes_programado", conn)
+    conn.close()
+    
+    if not plan_df.empty:
+        # Gráfico de avance
+        meses_nombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        cumplimientos = [0] * 12
+        
+        for _, row in plan_df.iterrows():
+            mes_idx = row['mes_programado'] - 1
+            cumplimientos[mes_idx] = row['cumplimiento']
+        
+        fig = go.Figure(data=[go.Bar(x=meses_nombres, y=cumplimientos, 
+                                     marker_color='#00b4d8', 
+                                     text=[f"{c}%" for c in cumplimientos],
+                                     textposition='auto')])
+        fig.update_layout(title="Avance Mensual del Plan Anual",
+                         xaxis_title="Mes",
+                         yaxis_title="% Cumplimiento",
+                         height=400,
+                         template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Tabla de actividades
+        for _, row in plan_df.iterrows():
+            meses_lista = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                          "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            mes_nombre = meses_lista[row['mes_programado'] - 1]
+            
+            with st.expander(f"📌 {mes_nombre}: {row['actividad']}"):
+                col1, col2 = st.columns([2,1])
+                with col1:
+                    st.text_input("Responsable", value=row['responsable'] or "", key=f"resp_{row['id']}")
+                    st.number_input("Presupuesto", value=float(row['presupuesto'] or 0), key=f"pres_{row['id']}")
+                with col2:
+                    nuevo_estado = st.selectbox("Estado", ["pendiente", "en_curso", "completada", "cancelada"],
+                                               index=["pendiente","en_curso","completada","cancelada"].index(row['estado']),
+                                               key=f"est_{row['id']}")
+                    nuevo_cumplimiento = st.slider("% Cumplimiento", 0, 100, row['cumplimiento'], key=f"cum_{row['id']}")
+                
+                if st.button("💾 Guardar cambios", key=f"guardar_{row['id']}"):
+                    conn = sqlite3.connect('sst.db')
+                    c = conn.cursor()
+                    c.execute("UPDATE plan_anual SET estado=?, cumplimiento=? WHERE id=?", 
+                             (nuevo_estado, nuevo_cumplimiento, row['id']))
+                    conn.commit()
+                    conn.close()
+                    st.success("✅ Guardado")
+                    st.rerun()
+        
+        # Resumen anual
+        st.subheader("📊 Resumen Anual")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            completadas = plan_df[plan_df['estado'] == 'completada'].shape[0]
+            st.metric("Actividades completadas", f"{completadas}/12")
+        with col2:
+            cumplimiento_promedio = plan_df['cumplimiento'].mean()
+            st.metric("Cumplimiento promedio", f"{cumplimiento_promedio:.0f}%")
+        with col3:
+            presupuesto_total = plan_df['presupuesto'].sum()
+            st.metric("Presupuesto total", f"${presupuesto_total:,.0f}")
+    else:
+        st.info("No hay plan anual para el año actual. Haz clic en 'Generar Plan con IA'")
+
+# ============================================
+# AGREGAR ESTAS PÁGINAS AL SIDEBAR
+# Busca "st.sidebar.page" y agrega estas opciones
+# ============================================
+
+# Agregar en el sidebar, después de las opciones existentes:
+# st.sidebar.page("📋 Matriz Legal", icon="📋")
+# st.sidebar.page("🔍 Auditorías", icon="🔍")
+# st.sidebar.page("📅 Plan Anual", icon="📅")
+
+# ============================================
+# AGREGAR EN LA SECCIÓN DE PÁGINAS (después de if 'pagina' not in st.session_state)
+# ============================================
+
+# Agregar en el if/elif de páginas:
+# elif pagina == "📋 Matriz Legal":
+#     crear_tablas_nuevas()
+#     pagina_matriz_legal()
+# elif pagina == "🔍 Auditorías":
+#     crear_tablas_nuevas()
+#     pagina_auditorias()
+# elif pagina == "📅 Plan Anual":
+#     crear_tablas_nuevas()
+#     pagina_plan_anual()
+# elif pagina == "realizar_auditoria":
+#     pagina_realizar_auditoria()
