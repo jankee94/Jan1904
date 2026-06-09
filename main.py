@@ -2,16 +2,15 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import requests
+import itertools
 from datetime import datetime
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
-# CSS profesional
+# CSS
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-    }
+    .stApp { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
     header[data-testid="stHeader"] { display: none; }
     footer { display: none !important; }
     .stButton > button {
@@ -26,6 +25,70 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# ========== IA CON MULTIPLES KEYS ==========
+def get_gemini_keys():
+    keys = []
+    i = 1
+    while True:
+        key = st.secrets.get(f"GEMINI_API_KEY_{i}")
+        if not key:
+            break
+        keys.append(key)
+        i += 1
+    if not keys:
+        old_key = st.secrets.get("GEMINI_API_KEY")
+        if old_key:
+            keys.append(old_key)
+    return keys
+
+def get_groq_key():
+    return st.secrets.get("GROQ_API_KEY")
+
+GEMINI_KEYS = get_gemini_keys()
+GROQ_KEY = get_groq_key()
+gemini_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
+
+def call_gemini(prompt):
+    if not GEMINI_KEYS:
+        return None
+    for _ in range(len(GEMINI_KEYS)):
+        key = next(gemini_cycle)
+        try:
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+            headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+            data = {"contents": [{"parts": [{"text": prompt}]}]}
+            r = requests.post(url, json=data, headers=headers, timeout=30)
+            if r.status_code == 200:
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            elif r.status_code == 429:
+                continue
+        except:
+            continue
+    return None
+
+def call_groq(prompt):
+    if not GROQ_KEY:
+        return None
+    try:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
+        data = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.7}
+        r = requests.post(url, json=data, headers=headers, timeout=30)
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"]
+    except:
+        pass
+    return None
+
+def call_best_ia(prompt):
+    respuesta = call_gemini(prompt)
+    if respuesta:
+        return f"🤖 **Gemini:** {respuesta}"
+    respuesta = call_groq(prompt)
+    if respuesta:
+        return f"🟢 **Groq:** {respuesta}"
+    return "⚠️ No se pudo obtener respuesta de ninguna IA. Verifica las API keys."
 
 # ========== BASE DE DATOS ==========
 conn = sqlite3.connect("sst.db", check_same_thread=False)
@@ -58,14 +121,10 @@ if not cursor.fetchone():
 
 cursor.execute("SELECT COUNT(*) FROM peligros")
 if cursor.fetchone()[0] == 0:
-    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Físico', 'Ruido excesivo en planta', 2, 2, 'II')")
-    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Ergonómico', 'Posturas inadecuadas', 3, 2, 'II')")
-    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Realizar matriz de riesgos', 'Coordinador SST', '2024-12-31', 'Pendiente')")
-    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Capacitación en prevención', 'SST', '2024-11-30', 'En progreso')")
+    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1, 'Físico', 'Ruido excesivo', 2, 2, 'II')")
+    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1, 'Realizar matriz de riesgos', 'SST', '2024-12-31', 'Pendiente')")
     cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1, 'Juan Pérez', '12345678', 'Operario')")
-    cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1, 'María Gómez', '87654321', 'Supervisora')")
     conn.commit()
-
 conn.commit()
 
 def verificar_login(username, password):
@@ -74,25 +133,6 @@ def verificar_login(username, password):
     if user:
         return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
     return None
-
-# ========== IA CORREGIDA ==========
-def call_ia(prompt):
-    # Intentar obtener API key de secrets primero
-    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyD3QhEohGJeYhVtM7JmBZ2nXvZJFxJZv3U")
-    
-    try:
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
-        headers = {"Content-Type": "application/json", "x-goog-api-key": api_key}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            return f"⚠️ Error {response.status_code}: No se pudo conectar con la IA. Verifica la API key."
-    except Exception as e:
-        return f"⚠️ Error de conexión: {str(e)}. Verifica tu conexión a internet."
 
 # ========== SESION ==========
 if "auth" not in st.session_state:
@@ -142,15 +182,7 @@ with st.sidebar:
     
     menu = st.radio(
         "📋 MÓDULOS",
-        [
-            "📊 Dashboard",
-            "🤖 Diagnóstico IA",
-            "⚠️ Peligros",
-            "✅ Plan de Acción",
-            "👥 Trabajadores",
-            "📝 Incidentes",
-            "💬 Chat IA"
-        ],
+        ["📊 Dashboard", "🤖 Diagnóstico IA", "⚠️ Peligros", "✅ Plan de Acción", "👥 Trabajadores", "📝 Incidentes", "💬 Chat IA"],
         label_visibility="collapsed"
     )
     
@@ -162,7 +194,6 @@ with st.sidebar:
 # ========== DASHBOARD ==========
 if menu == "📊 Dashboard":
     st.title("📊 DASHBOARD SST")
-    
     df_peligros = pd.read_sql_query("SELECT * FROM peligros", conn)
     df_acciones = pd.read_sql_query("SELECT * FROM acciones", conn)
     df_trabajadores = pd.read_sql_query("SELECT * FROM trabajadores", conn)
@@ -174,11 +205,6 @@ if menu == "📊 Dashboard":
         st.metric("✅ Acciones", f"{completadas}/{len(df_acciones)}")
     with col3: st.metric("👥 Trabajadores", len(df_trabajadores))
     with col4: st.metric("📈 Progreso", "60%")
-    
-    st.markdown("---")
-    st.subheader("⚠️ Últimos peligros registrados")
-    if not df_peligros.empty:
-        st.dataframe(df_peligros[['tipo', 'descripcion', 'nivel']], use_container_width=True)
 
 # ========== DIAGNÓSTICO IA ==========
 elif menu == "🤖 Diagnóstico IA":
@@ -192,43 +218,37 @@ elif menu == "🤖 Diagnóstico IA":
         if st.form_submit_button("🚀 GENERAR DIAGNÓSTICO", width="stretch"):
             if nombre:
                 with st.spinner("🤖 IA generando diagnóstico..."):
-                    prompt = f"Realiza un diagnóstico SST para la empresa {nombre} con {trabajadores} trabajadores y ARL {arl}. Incluye 5 recomendaciones iniciales importantes."
-                    respuesta = call_ia(prompt)
+                    prompt = f"Realiza un diagnóstico SST para la empresa {nombre} con {trabajadores} trabajadores y ARL {arl}. Incluye 5 recomendaciones."
+                    respuesta = call_best_ia(prompt)
                     
                     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    cursor.execute('''INSERT INTO empresa (nombre, trabajadores, arl, diagnostico, fecha) 
-                                      VALUES (?, ?, ?, ?, ?)''', (nombre, trabajadores, arl, respuesta, fecha))
+                    cursor.execute("INSERT INTO empresa (nombre, trabajadores, arl, diagnostico, fecha) VALUES (?, ?, ?, ?, ?)",
+                                  (nombre, trabajadores, arl, respuesta, fecha))
                     conn.commit()
                     st.session_state.empresa_actual_id = cursor.lastrowid
                     
-                    st.success("✅ Diagnóstico generado exitosamente")
+                    st.success("✅ Diagnóstico generado")
                     st.markdown(respuesta)
             else:
-                st.error("Ingrese el nombre de la empresa")
-    
-    st.markdown("---")
-    st.subheader("📋 Diagnósticos anteriores")
-    df = pd.read_sql_query("SELECT id, nombre, trabajadores, arl, fecha FROM empresa ORDER BY id DESC", conn)
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
+                st.error("Ingrese el nombre")
 
 # ========== PELIGROS ==========
 elif menu == "⚠️ Peligros":
-    st.title("⚠️ PELIGROS - FASE 2 GTC-45")
+    st.title("⚠️ PELIGROS")
     
-    tab1, tab2 = st.tabs(["📋 Lista de Peligros", "➕ Agregar Peligro"])
+    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo"])
     
     with tab1:
         df = pd.read_sql_query("SELECT * FROM peligros", conn)
         if not df.empty:
             st.dataframe(df, use_container_width=True)
         else:
-            st.info("No hay peligros registrados")
+            st.info("No hay peligros")
     
     with tab2:
         with st.form("form_peligro"):
-            tipo = st.selectbox("Tipo de Peligro", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
-            descripcion = st.text_area("Descripción detallada")
+            tipo = st.selectbox("Tipo", ["Físico", "Químico", "Biológico", "Ergonómico", "Psicosocial", "Seguridad"])
+            descripcion = st.text_area("Descripción")
             probabilidad = st.slider("Probabilidad (1-4)", 1, 4, 2)
             severidad = st.slider("Severidad (1-3)", 1, 3, 2)
             
@@ -243,22 +263,19 @@ elif menu == "⚠️ Peligros":
             else:
                 st.info("🟡 NIVEL III - RIESGO BAJO")
             
-            if st.form_submit_button("💾 Guardar Peligro", width="stretch"):
+            if st.form_submit_button("Guardar", width="stretch"):
                 if descripcion:
-                    cursor.execute('''INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) 
-                                      VALUES (?, ?, ?, ?, ?, ?)''',
+                    cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (?, ?, ?, ?, ?, ?)",
                                   (1, tipo, descripcion, probabilidad, severidad, nivel))
                     conn.commit()
-                    st.success("✅ Peligro guardado")
+                    st.success("✅ Guardado")
                     st.rerun()
-                else:
-                    st.error("Ingrese una descripción")
 
 # ========== PLAN DE ACCIÓN ==========
 elif menu == "✅ Plan de Acción":
     st.title("✅ PLAN DE ACCIÓN")
     
-    tab1, tab2 = st.tabs(["📋 Seguimiento", "➕ Nueva Acción"])
+    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nueva"])
     
     with tab1:
         df = pd.read_sql_query("SELECT * FROM acciones", conn)
@@ -266,14 +283,8 @@ elif menu == "✅ Plan de Acción":
             for _, row in df.iterrows():
                 col1, col2 = st.columns([3, 1])
                 with col1:
-                    st.markdown(f"**📌 {row['descripcion']}**")
-                    st.caption(f"👤 {row['responsable']} | 📅 {row['fecha']}")
-                    if row['estado'] == "Completada":
-                        st.success("✅ Completada")
-                    elif row['estado'] == "En progreso":
-                        st.warning("⏳ En progreso")
-                    else:
-                        st.info("📋 Pendiente")
+                    st.markdown(f"**{row['descripcion']}**")
+                    st.caption(f"Responsable: {row['responsable']}")
                 with col2:
                     nuevo = st.selectbox("Estado", ["Pendiente", "En progreso", "Completada"], 
                                         index=["Pendiente", "En progreso", "Completada"].index(row['estado']),
@@ -284,20 +295,18 @@ elif menu == "✅ Plan de Acción":
                         st.rerun()
                 st.markdown("---")
         else:
-            st.info("No hay acciones registradas")
+            st.info("No hay acciones")
     
     with tab2:
         with st.form("form_accion"):
-            descripcion = st.text_area("Descripción de la acción")
+            descripcion = st.text_area("Descripción")
             responsable = st.text_input("Responsable")
-            fecha_limite = st.date_input("Fecha límite", datetime.now())
-            if st.form_submit_button("💾 Guardar Acción", width="stretch"):
+            if st.form_submit_button("Guardar", width="stretch"):
                 if descripcion and responsable:
-                    cursor.execute('''INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) 
-                                      VALUES (?, ?, ?, ?, ?)''',
-                                  (1, descripcion, responsable, fecha_limite.strftime("%Y-%m-%d"), "Pendiente"))
+                    cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (?, ?, ?, ?, ?)",
+                                  (1, descripcion, responsable, datetime.now().strftime("%Y-%m-%d"), "Pendiente"))
                     conn.commit()
-                    st.success("✅ Acción guardada")
+                    st.success("✅ Guardado")
                     st.rerun()
 
 # ========== TRABAJADORES ==========
@@ -311,7 +320,7 @@ elif menu == "👥 Trabajadores":
         if not df.empty:
             st.dataframe(df, use_container_width=True)
         else:
-            st.info("No hay trabajadores registrados")
+            st.info("No hay trabajadores")
     
     with tab2:
         with st.form("form_trabajador"):
@@ -320,8 +329,8 @@ elif menu == "👥 Trabajadores":
             cargo = st.text_input("Cargo")
             if st.form_submit_button("Registrar", width="stretch"):
                 if nombre:
-                    cursor.execute('''INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) 
-                                      VALUES (?, ?, ?, ?)''', (1, nombre, cedula, cargo))
+                    cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (?, ?, ?, ?)",
+                                  (1, nombre, cedula, cargo))
                     conn.commit()
                     st.success("✅ Registrado")
                     st.rerun()
@@ -331,18 +340,17 @@ elif menu == "📝 Incidentes":
     st.title("📝 INCIDENTES")
     
     with st.form("form_incidente"):
-        descripcion = st.text_area("Descripción del incidente")
+        descripcion = st.text_area("Descripción")
         fecha = st.date_input("Fecha", datetime.now())
-        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
+        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
         if st.form_submit_button("Reportar", width="stretch"):
             if descripcion:
-                cursor.execute('''INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) 
-                                  VALUES (?, ?, ?, ?)''', (1, descripcion, fecha.strftime("%Y-%m-%d"), gravedad))
+                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (?, ?, ?, ?)",
+                              (1, descripcion, fecha.strftime("%Y-%m-%d"), gravedad))
                 conn.commit()
                 st.success("✅ Reportado")
                 st.rerun()
     
-    st.markdown("---")
     st.subheader("📋 Historial")
     df = pd.read_sql_query("SELECT * FROM incidentes ORDER BY fecha DESC", conn)
     if not df.empty:
@@ -365,7 +373,7 @@ elif menu == "💬 Chat IA":
             st.write(prompt)
         with st.chat_message("assistant"):
             with st.spinner("🤖 Pensando..."):
-                respuesta = call_ia(prompt)
+                respuesta = call_best_ia(prompt)
                 st.write(respuesta)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
