@@ -1,38 +1,43 @@
-﻿import streamlit as st
+import streamlit as st
+import sqlite3
+import pandas as pd
 from datetime import datetime
-from core.db import db
-from utils.exporters import boton_exportar
 
 def render():
-    st.title("📝 REGISTRO DE INCIDENTES - FASE 6")
+    st.title("📝 INCIDENTES")
     
-    col1, col2 = st.columns([1, 1])
+    conn = sqlite3.connect("sst.db", check_same_thread=False)
+    cursor = conn.cursor()
+    empresa_id = st.session_state.get("empresa_actual_id", 1)
     
-    with col1:
-        with st.form("form_incidente"):
-            st.subheader("➕ Nuevo Incidente")
-            desc = st.text_area("Descripción del incidente")
-            fecha = st.date_input("Fecha del incidente", datetime.now())
-            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
-            tipo = st.selectbox("Tipo", ["Accidente", "Incidente", "Enfermedad Laboral", "Casi accidente"])
-            
-            if st.form_submit_button("📝 Registrar Incidente", use_container_width=True):
-                if desc:
-                    db.guardar_incidente(desc, fecha.strftime("%Y-%m-%d"), gravedad)
-                    st.success("✅ Incidente registrado")
-                    st.rerun()
+    if not empresa_id:
+        st.warning("⚠️ Primero debe crear un diagnóstico de empresa")
+        return
     
-    with col2:
-        st.subheader("📊 Estadísticas Rápidas")
-        df = db.obtener_incidentes()
+    tab1, tab2 = st.tabs(["📋 Historial", "➕ Reportar Incidente"])
+    
+    with tab1:
+        df = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ? ORDER BY fecha DESC", conn, params=(empresa_id,))
         if not df.empty:
-            st.metric("Total Incidentes", len(df))
-            st.metric("Graves", len(df[df['gravedad'] == 'Grave']) if 'gravedad' in df.columns else 0)
-            st.metric("Este Mes", len([i for i in df['fecha'] if i.startswith(datetime.now().strftime("%Y-%m"))]) if 'fecha' in df.columns else 0)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No hay incidentes registrados")
     
-    st.markdown("---")
-    st.subheader("📋 Historial de Incidentes")
-    df = db.obtener_incidentes()
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
-        boton_exportar(df, "Incidentes")
+    with tab2:
+        with st.form("form_incidente"):
+            descripcion = st.text_area("Descripción del incidente")
+            fecha = st.date_input("Fecha", datetime.now())
+            gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave", "Mortal"])
+            
+            if st.form_submit_button("📝 Reportar Incidente", use_container_width=True):
+                if descripcion:
+                    cursor.execute('''INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) 
+                                      VALUES (?, ?, ?, ?)''',
+                                  (empresa_id, descripcion, fecha.strftime("%Y-%m-%d"), gravedad))
+                    conn.commit()
+                    st.success("✅ Incidente reportado")
+                    st.rerun()
+                else:
+                    st.error("Ingrese una descripción del incidente")
+    
+    conn.close()

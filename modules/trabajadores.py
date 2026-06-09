@@ -1,32 +1,42 @@
-﻿import streamlit as st
-from core.db import db
-from utils.exporters import boton_exportar
+import streamlit as st
+import sqlite3
+import pandas as pd
 
 def render():
-    st.title("👥 GESTIÓN DE TRABAJADORES - FASE 5")
+    st.title("👥 TRABAJADORES")
     
-    tab1, tab2 = st.tabs(["📋 Lista", "➕ Nuevo Trabajador"])
+    conn = sqlite3.connect("sst.db", check_same_thread=False)
+    cursor = conn.cursor()
+    empresa_id = st.session_state.get("empresa_actual_id", 1)
+    
+    if not empresa_id:
+        st.warning("⚠️ Primero debe crear un diagnóstico de empresa")
+        return
+    
+    tab1, tab2 = st.tabs(["📋 Lista de Trabajadores", "➕ Nuevo Trabajador"])
     
     with tab1:
-        df = db.obtener_trabajadores()
+        df = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(empresa_id,))
         if not df.empty:
             st.dataframe(df, use_container_width=True)
-            boton_exportar(df, "Trabajadores")
         else:
-            st.info("📭 No hay trabajadores registrados")
+            st.info("No hay trabajadores registrados")
     
     with tab2:
         with st.form("form_trabajador"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nombre = st.text_input("Nombre completo")
-                cedula = st.text_input("Cédula")
-            with col2:
-                cargo = st.text_input("Cargo")
-                area = st.text_input("Área/Dependencia")
+            nombre = st.text_input("Nombre completo")
+            cedula = st.text_input("Cédula")
+            cargo = st.text_input("Cargo")
             
             if st.form_submit_button("💾 Registrar Trabajador", use_container_width=True):
                 if nombre:
-                    db.guardar_trabajador(nombre, cedula, cargo)
+                    cursor.execute('''INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) 
+                                      VALUES (?, ?, ?, ?)''',
+                                  (empresa_id, nombre, cedula, cargo))
+                    conn.commit()
                     st.success("✅ Trabajador registrado")
                     st.rerun()
+                else:
+                    st.error("Ingrese el nombre del trabajador")
+    
+    conn.close()

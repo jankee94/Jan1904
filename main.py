@@ -1,11 +1,9 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from modules import dashboard, diagnostico_ia, peligros, acciones, trabajadores, incidentes, chat_ia
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
-# CSS PROFESIONAL
 st.markdown("""
 <style>
     .stApp {
@@ -27,7 +25,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Base de datos
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -44,7 +41,6 @@ if not cursor.fetchone():
     cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)",
                   ('admin', 'admin123', 'Administrador', 'admin'))
     conn.commit()
-conn.commit()
 
 def verificar_login(username, password):
     cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?", (username, password))
@@ -92,7 +88,6 @@ if not st.session_state.auth:
     """, unsafe_allow_html=True)
     st.stop()
 
-# SIDEBAR
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=50)
     st.markdown(f"**👤 {st.session_state.user['nombre']}**")
@@ -113,13 +108,16 @@ with st.sidebar:
         st.session_state.auth = False
         st.rerun()
 
-# RENDER MODULOS
+# Importar módulos dinámicamente
 if menu == "📊 Dashboard":
-    dashboard.render()
+    from modules.dashboard import render as dashboard_render
+    dashboard_render()
 elif menu == "🤖 Diagnóstico IA":
-    diagnostico_ia.render()
+    from modules.diagnostico_ia import render as diagnostico_render
+    diagnostico_render()
 elif menu == "⚠️ Peligros":
-    peligros.render()
+    from modules.peligros import render as peligros_render
+    peligros_render()
 elif menu == "✅ Plan de Acción":
     from modules.acciones import render as acciones_render
     acciones_render()
