@@ -1,7 +1,6 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-from datetime import datetime
 
 def render():
     st.title("📊 DASHBOARD SST")
@@ -9,11 +8,17 @@ def render():
     conn = sqlite3.connect("sst.db", check_same_thread=False)
     empresa_id = st.session_state.get("empresa_actual_id", 1)
     
-    # Obtener datos
-    df_peligros = pd.read_sql_query("SELECT * FROM peligros WHERE empresa_id = ?", conn, params=(empresa_id,))
-    df_acciones = pd.read_sql_query("SELECT * FROM acciones WHERE empresa_id = ?", conn, params=(empresa_id,))
-    df_trabajadores = pd.read_sql_query("SELECT * FROM trabajadores WHERE empresa_id = ?", conn, params=(empresa_id,))
-    df_incidentes = pd.read_sql_query("SELECT * FROM incidentes WHERE empresa_id = ?", conn, params=(empresa_id,))
+    # Verificar si existe empresa_id en las tablas
+    try:
+        df_peligros = pd.read_sql_query("SELECT * FROM peligros", conn)
+        df_acciones = pd.read_sql_query("SELECT * FROM acciones", conn)
+        df_trabajadores = pd.read_sql_query("SELECT * FROM trabajadores", conn)
+        df_incidentes = pd.read_sql_query("SELECT * FROM incidentes", conn)
+    except:
+        df_peligros = pd.DataFrame()
+        df_acciones = pd.DataFrame()
+        df_trabajadores = pd.DataFrame()
+        df_incidentes = pd.DataFrame()
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:

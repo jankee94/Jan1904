@@ -28,20 +28,6 @@ st.markdown("""
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    nombre TEXT,
-    rol TEXT DEFAULT 'trabajador'
-)''')
-
-cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
-if not cursor.fetchone():
-    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)",
-                  ('admin', 'admin123', 'Administrador', 'admin'))
-    conn.commit()
-
 def verificar_login(username, password):
     cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?", (username, password))
     user = cursor.fetchone()
@@ -54,7 +40,7 @@ if "auth" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = None
 if "empresa_actual_id" not in st.session_state:
-    st.session_state.empresa_actual_id = None
+    st.session_state.empresa_actual_id = 1
 
 if not st.session_state.auth:
     st.markdown("""
@@ -96,7 +82,6 @@ with st.sidebar:
     
     menu = st.radio("📋 MENU", [
         "📊 Dashboard",
-        "🤖 Diagnóstico IA",
         "⚠️ Peligros",
         "✅ Plan de Acción",
         "👥 Trabajadores",
@@ -108,25 +93,21 @@ with st.sidebar:
         st.session_state.auth = False
         st.rerun()
 
-# Importar módulos dinámicamente
 if menu == "📊 Dashboard":
-    from modules.dashboard import render as dashboard_render
-    dashboard_render()
-elif menu == "🤖 Diagnóstico IA":
-    from modules.diagnostico_ia import render as diagnostico_render
-    diagnostico_render()
+    from modules.dashboard import render
+    render()
 elif menu == "⚠️ Peligros":
-    from modules.peligros import render as peligros_render
-    peligros_render()
+    from modules.peligros import render
+    render()
 elif menu == "✅ Plan de Acción":
-    from modules.acciones import render as acciones_render
-    acciones_render()
+    from modules.acciones import render
+    render()
 elif menu == "👥 Trabajadores":
-    from modules.trabajadores import render as trabajadores_render
-    trabajadores_render()
+    from modules.trabajadores import render
+    render()
 elif menu == "📝 Incidentes":
-    from modules.incidentes import render as incidentes_render
-    incidentes_render()
+    from modules.incidentes import render
+    render()
 elif menu == "💬 Chat IA":
-    from modules.chat_ia import render as chat_render
-    chat_render()
+    from modules.chat_ia import render
+    render()
