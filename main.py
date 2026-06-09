@@ -11,25 +11,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS PROFESIONAL
 st.markdown("""
 <style>
-    /* Reset completo */
     .stApp {
         background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
         height: 100vh;
     }
-    /* Ocultar header */
     header[data-testid="stHeader"] {
         display: none;
     }
-    /* Eliminar padding */
     .block-container {
         padding: 0 !important;
         max-width: 340px !important;
         margin: 0 auto !important;
     }
-    /* Centrar vertical */
     .stApp > div {
         display: flex;
         align-items: center;
@@ -37,7 +32,6 @@ st.markdown("""
         height: 100vh;
         flex-direction: column;
     }
-    /* Tarjeta glassmorphism */
     .stForm {
         background: rgba(20, 20, 40, 0.75);
         backdrop-filter: blur(14px);
@@ -47,7 +41,6 @@ st.markdown("""
         box-shadow: 0 25px 45px rgba(0,0,0,0.3);
         width: 100%;
     }
-    /* Logo y textos */
     .login-logo {
         text-align: center;
         margin-bottom: 20px;
@@ -70,14 +63,12 @@ st.markdown("""
         text-align: center;
         margin-top: 5px;
     }
-    /* Labels */
     .stTextInput label {
         color: rgba(255,255,255,0.75) !important;
         font-size: 12px !important;
         font-weight: 500 !important;
         margin-bottom: 5px !important;
     }
-    /* Inputs */
     .stTextInput input {
         background: rgba(255,255,255,0.08) !important;
         border: 1px solid rgba(255,255,255,0.2) !important;
@@ -92,7 +83,6 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(102,126,234,0.3) !important;
         outline: none !important;
     }
-    /* Botón */
     .stButton button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         border: none !important;
@@ -103,13 +93,11 @@ st.markdown("""
         width: 100% !important;
         margin-top: 12px !important;
         cursor: pointer !important;
-        transition: all 0.2s ease;
     }
     .stButton button:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(102,126,234,0.4);
     }
-    /* Link olvidó contraseña */
     .forgot-link {
         text-align: center;
         margin-top: 18px;
@@ -118,12 +106,10 @@ st.markdown("""
         color: rgba(255,255,255,0.45);
         font-size: 11px;
         text-decoration: none;
-        transition: color 0.2s;
     }
     .forgot-link a:hover {
         color: #a8c0ff;
     }
-    /* Footer */
     .login-footer {
         text-align: center;
         font-size: 9px;
@@ -132,7 +118,6 @@ st.markdown("""
         padding-top: 12px;
         border-top: 1px solid rgba(255,255,255,0.08);
     }
-    /* Mensajes de error */
     .stAlert {
         background: rgba(255,50,50,0.12) !important;
         border: none !important;
@@ -141,14 +126,12 @@ st.markdown("""
         padding: 8px !important;
         margin-top: 12px !important;
     }
-    /* Ocultar footer de Streamlit */
     footer {
         display: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Logo y branding
 st.markdown("""
 <div class="login-logo">
     <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png">
@@ -157,7 +140,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Base de datos
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -166,8 +148,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
     username TEXT UNIQUE,
     password TEXT,
     nombre TEXT,
-    rol TEXT DEFAULT 'trabajador',
-    activo INTEGER DEFAULT 1
+    rol TEXT DEFAULT 'trabajador'
 )''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS empresa (
@@ -211,7 +192,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
     gravedad TEXT
 )''')
 
-# Usuario admin por defecto
 cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
 if not cursor.fetchone():
     cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)",
@@ -220,19 +200,17 @@ if not cursor.fetchone():
 conn.commit()
 
 def verificar_login(username, password):
-    cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=? AND activo=1", (username, password))
+    cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?", (username, password))
     user = cursor.fetchone()
     if user:
         return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
     return None
 
-# Sesión
 if "auth" not in st.session_state:
     st.session_state.auth = False
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# LOGIN
 if not st.session_state.auth:
     with st.form("login_form"):
         username = st.text_input("👤 Usuario", placeholder="Ingrese su usuario")
@@ -257,7 +235,6 @@ if not st.session_state.auth:
     """, unsafe_allow_html=True)
     st.stop()
 
-# DASHBOARD POST-LOGIN
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
 st.success(f"✅ Bienvenido, {st.session_state.user['nombre']}!")
@@ -266,4 +243,4 @@ if st.button("🚪 Cerrar Sesión", use_container_width=True):
     st.session_state.auth = False
     st.rerun()
 
-st.info("📌 Módulos disponibles próximamente...")
+st.info("📌 Módulos disponibles próximamente: Diagnóstico IA, Peligros, Plan de Acción, Trabajadores, Incidentes, Chat IA")
