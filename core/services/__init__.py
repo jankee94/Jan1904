@@ -2,3 +2,4 @@ from core.services.capacitacion_service import capacitacion_service
 from core.services.inspeccion_service import inspeccion_service
 from core.services.emergencia_service import emergencia_service
 from core.services.emergencia_service import emergencia_service
+from core.services.documento_service import documento_service

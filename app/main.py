@@ -14,6 +14,7 @@ from firebase.firestore.client import firestore_client
 from modules.capacitaciones.ui import render_capacitaciones
 from modules.inspecciones.ui import render_inspecciones
 from modules.emergencias.ui import render_emergencias
+from modules.documental.ui import render_documental
 
 st.set_page_config(
     page_title=settings.APP_NAME,
@@ -243,5 +244,6 @@ pages.get(selected_module, show_dashboard)()
 # Footer
 st.markdown("---")
 st.markdown(f"<p style='text-align: center; color: rgba(255,255,255,0.4); font-size: 12px;'>🔄 {settings.APP_NAME} v{settings.APP_VERSION} | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+
 
 

@@ -2,3 +2,4 @@ from core.models.capacitacion import Capacitacion, AsistenciaCapacitacion, Evalu
 from core.models.inspeccion import Inspeccion, HallazgoInspeccion, ChecklistItem
 from core.models.emergencia import Brigadista, EquipoEmergencia, Simulacro, PlanEmergencia, AlertaEmergencia
 from core.models.emergencia import Brigadista, EquipoEmergencia, Simulacro, PlanEmergencia, AlertaEmergencia
+from core.models.documento import Documento, ControlCambio, AprobacionDocumento
