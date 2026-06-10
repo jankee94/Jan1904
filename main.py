@@ -382,6 +382,32 @@ elif menu == "💬 Chat IA":
                 st.write(respuesta)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
+
+# ========== NUEVOS MÓDULOS AGREGADOS ==========
+elif menu == "⚡ Diagnóstico Rápido":
+    init_empresa_data()
+    pagina_diagnostico_rapido()
+
+elif menu == "🏢 Configuración Empresa":
+    init_empresa_data()
+    pagina_configuracion_empresa()
+
+elif menu == "📊 Informes":
+    pagina_informes()
+
+elif menu == "📋 Matriz Legal":
+    crear_tablas_nuevas()
+    pagina_matriz_legal()
+
+elif menu == "🔍 Auditorías":
+    crear_tablas_nuevas()
+    pagina_auditorias()
+
+elif menu == "📅 Plan Anual":
+    crear_tablas_nuevas()
+    pagina_plan_anual()
+
+
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>🔄 SG-SST PHVA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
 
