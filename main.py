@@ -4,11 +4,7 @@ import pandas as pd
 import requests
 import itertools
 from datetime import datetime
-import plotly.express as px
-import plotly.graph_objects as go
 import io
-import base64
-import tempfile
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -31,7 +27,7 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 
-# ========== IA CON MULTIPLES KEYS ==========
+# ========== IA ==========
 def get_gemini_keys():
     keys = []
     i = 1
@@ -66,8 +62,6 @@ def call_gemini(prompt):
             r = requests.post(url, json=data, headers=headers, timeout=30)
             if r.status_code == 200:
                 return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            elif r.status_code == 429:
-                continue
         except:
             continue
     return None
@@ -93,75 +87,33 @@ def call_best_ia(prompt):
     respuesta = call_groq(prompt)
     if respuesta:
         return respuesta
-    return "⚠️ No se pudo obtener respuesta de ninguna IA. Verifica las API keys."
+    return "⚠️ No se pudo obtener respuesta de ninguna IA."
 
 # ========== BASE DE DATOS ==========
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, nombre TEXT, rol TEXT DEFAULT 'trabajador'
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS empresa (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, nit TEXT, nombre TEXT, trabajadores INTEGER, arl TEXT, diagnostico TEXT, fecha TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, tipo TEXT, descripcion TEXT, probabilidad INTEGER, severidad INTEGER, nivel TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, responsable TEXT, fecha TEXT, estado TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, nombre TEXT, cedula TEXT, cargo TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, fecha TEXT, gravedad TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, nit TEXT, ubicacion TEXT, ciudad TEXT, sector TEXT, telefono TEXT, email TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_legal (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER DEFAULT 1, norma TEXT, articulo TEXT, requisito TEXT, cumple INTEGER DEFAULT 0, evidencia TEXT, responsable TEXT, fecha_cierre DATE
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS auditorias (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER DEFAULT 1, codigo TEXT, fecha DATE, tipo TEXT, auditor_id TEXT, hallazgos TEXT, puntuacion INTEGER DEFAULT 0, estado TEXT DEFAULT 'planificada'
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS checklist_iso (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, pregunta TEXT, seccion TEXT, peso INTEGER DEFAULT 4
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS hallazgos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, auditoria_id INTEGER, checklist_id INTEGER, tipo TEXT, comentario TEXT, evidencia TEXT
-)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS plan_anual (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER DEFAULT 1, anio INTEGER, actividad TEXT, mes_programado INTEGER, responsable TEXT, presupuesto REAL DEFAULT 0, estado TEXT DEFAULT 'pendiente', cumplimiento INTEGER DEFAULT 0, evidencia TEXT
-)''')
+# Tablas
+cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, nombre TEXT, rol TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, tipo TEXT, descripcion TEXT, probabilidad INTEGER, severidad INTEGER, nivel TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, responsable TEXT, fecha TEXT, estado TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, nombre TEXT, cedula TEXT, cargo TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, fecha TEXT, gravedad TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS empresa_config (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, nit TEXT, ubicacion TEXT, ciudad TEXT, sector TEXT, telefono TEXT, email TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_legal (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, norma TEXT, articulo TEXT, requisito TEXT, cumple INTEGER)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS auditorias (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, codigo TEXT, fecha TEXT, auditor_id TEXT, puntuacion INTEGER)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS plan_anual (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, anio INTEGER, actividad TEXT, mes_programado INTEGER, responsable TEXT, cumplimiento INTEGER)''')
 
+# Usuario admin
 cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
 if not cursor.fetchone():
-    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)",
-                  ('admin', 'admin123', 'Administrador', 'admin'))
+    cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)", ('admin', 'admin123', 'Administrador', 'admin'))
     conn.commit()
 
+# Datos empresa por defecto
 cursor.execute("SELECT COUNT(*) FROM empresa_config")
 if cursor.fetchone()[0] == 0:
-    cursor.execute("INSERT INTO empresa_config (nombre, nit, ubicacion, ciudad, sector, telefono, email) VALUES (?,?,?,?,?,?,?)",
-                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogota', 'Servicios', '6011234567', 'contacto@miempresa.com'))
-    conn.commit()
-
-cursor.execute("SELECT COUNT(*) FROM checklist_iso")
-if cursor.fetchone()[0] == 0:
-    preguntas = [
-        ("Existe una politica de SST documentada?", "4.2 Politica", 5),
-        ("Se han identificado peligros y evaluado riesgos?", "6.1.2", 5),
-        ("Existen objetivos de SST medibles?", "6.2.1", 4),
-        ("Se ha implementado un plan de emergencias?", "8.2", 5),
-        ("Se realizan auditorias internas?", "9.2", 5),
-        ("Se investigan incidentes?", "10.2", 5),
-        ("Existe COPASST?", "Decreto 1072", 5),
-        ("Se realizan examenes medicos?", "Decreto 1072", 4)
-    ]
-    for p, s, pe in preguntas:
-        cursor.execute("INSERT INTO checklist_iso (pregunta, seccion, peso) VALUES (?,?,?)", (p, s, pe))
+    cursor.execute("INSERT INTO empresa_config (nombre, nit, ubicacion, ciudad, sector, telefono, email) VALUES (?,?,?,?,?,?,?)", ('Mi Empresa SAS', '900.000.000-1', 'Calle 123', 'Bogota', 'Servicios', '6011234567', 'contacto@miempresa.com'))
     conn.commit()
 
 conn.commit()
@@ -173,70 +125,46 @@ def verificar_login(username, password):
         return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
     return None
 
-def init_empresa_data():
-    pass
-
 def get_empresa_data():
-    cursor.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    cursor.execute("SELECT nombre, nit, ubicacion, ciudad, sector FROM empresa_config LIMIT 1")
     data = cursor.fetchone()
     if data:
-        return {'nombre': data[0], 'nit': data[1], 'ubicacion': data[2], 'ciudad': data[3], 'sector': data[4], 'telefono': data[5], 'email': data[6]}
+        return {"nombre": data[0], "nit": data[1], "ubicacion": data[2], "ciudad": data[3], "sector": data[4]}
     return {}
 
-def crear_tablas_nuevas():
-    pass
-
-def pagina_matriz_legal():
-    st.header("Matriz Legal")
-    df = pd.read_sql_query("SELECT * FROM matriz_legal", conn)
-    st.dataframe(df, use_container_width=True)
-
-def pagina_auditorias():
-    st.header("Auditorias")
-    df = pd.read_sql_query("SELECT * FROM auditorias", conn)
-    st.dataframe(df, use_container_width=True)
-
-def pagina_plan_anual():
-    st.header("Plan Anual")
-    df = pd.read_sql_query("SELECT * FROM plan_anual", conn)
-    st.dataframe(df, use_container_width=True)
-
-def pagina_configuracion_empresa():
-    st.header("Configuracion Empresa")
-    datos = get_empresa_data()
-    with st.form("empresa_form"):
-        nombre = st.text_input("Nombre", value=datos.get('nombre', ''))
-        nit = st.text_input("NIT", value=datos.get('nit', ''))
-        ubicacion = st.text_input("Ubicacion", value=datos.get('ubicacion', ''))
-        ciudad = st.text_input("Ciudad", value=datos.get('ciudad', ''))
-        sector = st.text_input("Sector", value=datos.get('sector', ''))
-        telefono = st.text_input("Telefono", value=datos.get('telefono', ''))
-        email = st.text_input("Email", value=datos.get('email', ''))
-        if st.form_submit_button("Guardar"):
-            cursor.execute("UPDATE empresa_config SET nombre=?, nit=?, ubicacion=?, ciudad=?, sector=?, telefono=?, email=?", 
-                          (nombre, nit, ubicacion, ciudad, sector, telefono, email))
+# ========== DATOS DE PRUEBA ==========
+def cargar_datos_prueba():
+    with st.spinner("Cargando datos de prueba..."):
+        cursor.execute("SELECT COUNT(*) FROM peligros")
+        if cursor.fetchone()[0] == 0:
+            # Peligros
+            peligros = [("Fisico", "Ruido excesivo", 3, 2, "II"), ("Ergonomico", "Posturas prolongadas", 2, 2, "II"), ("Quimico", "Exposicion a solventes", 2, 3, "I")]
+            for p in peligros:
+                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1,?,?,?,?,?)", p)
+            # Acciones
+            acciones = [("Implementar barreras acusticas", "Coordinador SST", "2024-12-15", "En progreso"), ("Capacitacion pausas activas", "SST", "2024-11-30", "Pendiente")]
+            for a in acciones:
+                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1,?,?,?,?)", a)
+            # Trabajadores
+            trabajadores = [("Carlos Lopez", "12345678", "Operario"), ("Maria Gomez", "87654321", "Supervisor")]
+            for t in trabajadores:
+                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1,?,?,?)", t)
+            # Incidentes
+            incidentes = [("Caida desde altura", "2024-10-15", "Grave"), ("Corte con herramienta", "2024-10-20", "Leve")]
+            for i in incidentes:
+                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (1,?,?,?)", i)
             conn.commit()
-            st.success("Guardado")
+            st.success("Datos de prueba cargados!")
+            st.balloons()
+        else:
+            st.info("Ya hay datos en el sistema")
 
-def pagina_diagnostico_rapido():
-    st.header("Diagnostico Rapido")
-    empresa = get_empresa_data()
-    st.info(f"Empresa: {empresa.get('nombre', 'No registrada')}")
-    if st.button("Generar Diagnostico"):
-        with st.spinner("IA generando..."):
-            prompt = f"Genera diagnostico SST para empresa {empresa.get('nombre', 'Desconocida')}"
-            respuesta = call_best_ia(prompt)
-            st.markdown(respuesta)
-
-def pagina_informes():
-    st.header("Informes")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Exportar a Excel"):
-            st.info("Funcionalidad en desarrollo")
-    with col2:
-        if st.button("Exportar a PDF"):
-            st.info("Funcionalidad en desarrollo")
+# ========== EXPORTAR ==========
+def exportar_excel(df, nombre):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=nombre, index=False)
+    return output.getvalue()
 
 # ========== SESION ==========
 if "auth" not in st.session_state:
@@ -248,17 +176,10 @@ if "user" not in st.session_state:
 if not st.session_state.auth:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.markdown('''
-        <div style="background: rgba(20,20,40,0.75); backdrop-filter: blur(14px); border-radius: 28px; padding: 35px; text-align:center">
-            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="65">
-            <h1 style="color:white; font-size:24px; margin:10px 0">SG-SST PHVA</h1>
-            <p style="color:rgba(255,255,255,0.6); font-size:12px">Seguridad y Salud, compromiso de todos</p>
-        </div>
-        ''', unsafe_allow_html=True)
-        
+        st.markdown('<div style="background: rgba(20,20,40,0.75); backdrop-filter: blur(14px); border-radius: 28px; padding: 35px; text-align:center"><img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="65"><h1 style="color:white; font-size:24px">SG-SST PHVA</h1><p style="color:rgba(255,255,255,0.6)">Seguridad y Salud, compromiso de todos</p></div>', unsafe_allow_html=True)
         with st.form("login_form"):
-            username = st.text_input("Usuario", placeholder="Ingrese su usuario")
-            password = st.text_input("Contraseña", type="password", placeholder="Ingrese su contraseña")
+            username = st.text_input("Usuario", placeholder="usuario")
+            password = st.text_input("Contraseña", type="password", placeholder="contraseña")
             if st.form_submit_button("INGRESAR", use_container_width=True):
                 user = verificar_login(username, password)
                 if user:
@@ -266,118 +187,84 @@ if not st.session_state.auth:
                     st.session_state.user = user
                     st.rerun()
                 else:
-                    st.error("Usuario o contraseña incorrectos")
-        
-        st.markdown('<div style="margin-top:20px; font-size:10px; color:rgba(255,255,255,0.3)">SG-SST PHVA | Desarrollado por JAN BENITEZ</div></div>', unsafe_allow_html=True)
+                    st.error("Usuario o contraseña incorrectos. Use admin/admin123")
+        st.markdown('<div style="text-align:center; font-size:10px; color:gray">SG-SST PHVA | JAN BENITEZ</div>', unsafe_allow_html=True)
     st.stop()
 
 # ========== SIDEBAR ==========
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=45)
     st.markdown(f"**{st.session_state.user['nombre']}**")
-    st.markdown(f"Rol: {st.session_state.user['rol'].upper()}")
     st.markdown("---")
-    
-    menu = st.radio(
-        "MODULOS",
-        ["Dashboard", "Diagnostico Rapido", "Configuracion Empresa", "Informes", "Peligros", "Plan de Accion", "Trabajadores", "Incidentes", "Matriz Legal", "Auditorias", "Plan Anual", "Chat IA"],
-        label_visibility="collapsed"
-    )
-    
-    st.markdown("---")
+    menu = st.radio("MODULOS", ["Dashboard", "Peligros", "Plan de Accion", "Trabajadores", "Incidentes", "Matriz Legal", "Auditorias", "Plan Anual", "Chat IA"])
     if st.button("Cerrar Sesion", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
-# ========== NAVEGACION ==========
+# ========== DASHBOARD ==========
 if menu == "Dashboard":
     st.title("Dashboard")
-    df_p = pd.read_sql_query("SELECT * FROM peligros", conn)
-    df_a = pd.read_sql_query("SELECT * FROM acciones", conn)
-    df_t = pd.read_sql_query("SELECT * FROM trabajadores", conn)
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("Peligros", len(df_p))
-    with col2: st.metric("Acciones", len(df_a))
-    with col3: st.metric("Trabajadores", len(df_t))
-    with col4: st.metric("Progreso", "60%")
+    with col1: st.metric("Peligros", pd.read_sql_query("SELECT COUNT(*) FROM peligros", conn).iloc[0,0])
+    with col2: st.metric("Acciones", pd.read_sql_query("SELECT COUNT(*) FROM acciones", conn).iloc[0,0])
+    with col3: st.metric("Trabajadores", pd.read_sql_query("SELECT COUNT(*) FROM trabajadores", conn).iloc[0,0])
+    with col4: st.metric("Incidentes", pd.read_sql_query("SELECT COUNT(*) FROM incidentes", conn).iloc[0,0])
+    st.markdown("---")
+    if st.button("Cargar Datos de Prueba", use_container_width=True):
+        cargar_datos_prueba()
+        st.rerun()
 
-elif menu == "Diagnostico Rapido":
-    pagina_diagnostico_rapido()
-
-elif menu == "Configuracion Empresa":
-    pagina_configuracion_empresa()
-
-elif menu == "Informes":
-    pagina_informes()
-
+# ========== PELIGROS ==========
 elif menu == "Peligros":
-    st.title("Peligros")
-    with st.form("add_peligro"):
-        tipo = st.selectbox("Tipo", ["Fisico", "Quimico", "Biologico", "Ergonomico", "Psicosocial", "Seguridad"])
-        desc = st.text_area("Descripcion")
-        prob = st.slider("Probabilidad", 1, 4, 2)
-        sev = st.slider("Severidad", 1, 3, 2)
-        if st.form_submit_button("Guardar"):
-            if desc:
-                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad) VALUES (1,?,?,?,?)", (tipo, desc, prob, sev))
-                conn.commit()
-                st.rerun()
+    st.header("Peligros")
     df = pd.read_sql_query("SELECT * FROM peligros", conn)
     st.dataframe(df, use_container_width=True)
+    excel_data = exportar_excel(df, "peligros")
+    st.download_button("Exportar a Excel", data=excel_data, file_name=f"peligros_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
+# ========== PLAN DE ACCION ==========
 elif menu == "Plan de Accion":
-    st.title("Plan de Accion")
-    with st.form("add_accion"):
-        desc = st.text_area("Descripcion")
-        resp = st.text_input("Responsable")
-        if st.form_submit_button("Guardar"):
-            if desc and resp:
-                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1,?,?,?,?)", (desc, resp, datetime.now().strftime("%Y-%m-%d"), "Pendiente"))
-                conn.commit()
-                st.rerun()
+    st.header("Plan de Accion")
     df = pd.read_sql_query("SELECT * FROM acciones", conn)
     st.dataframe(df, use_container_width=True)
+    excel_data = exportar_excel(df, "acciones")
+    st.download_button("Exportar a Excel", data=excel_data, file_name=f"acciones_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
+# ========== TRABAJADORES ==========
 elif menu == "Trabajadores":
-    st.title("Trabajadores")
-    with st.form("add_trabajador"):
-        nombre = st.text_input("Nombre")
-        cedula = st.text_input("Cedula")
-        cargo = st.text_input("Cargo")
-        if st.form_submit_button("Registrar"):
-            if nombre:
-                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1,?,?,?)", (nombre, cedula, cargo))
-                conn.commit()
-                st.rerun()
+    st.header("Trabajadores")
     df = pd.read_sql_query("SELECT * FROM trabajadores", conn)
     st.dataframe(df, use_container_width=True)
+    excel_data = exportar_excel(df, "trabajadores")
+    st.download_button("Exportar a Excel", data=excel_data, file_name=f"trabajadores_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
+# ========== INCIDENTES ==========
 elif menu == "Incidentes":
-    st.title("Incidentes")
-    with st.form("add_incidente"):
-        desc = st.text_area("Descripcion")
-        fecha = st.date_input("Fecha", datetime.now())
-        gravedad = st.selectbox("Gravedad", ["Leve", "Moderada", "Grave"])
-        if st.form_submit_button("Reportar"):
-            if desc:
-                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (1,?,?,?)", (desc, fecha.strftime("%Y-%m-%d"), gravedad))
-                conn.commit()
-                st.rerun()
+    st.header("Incidentes")
     df = pd.read_sql_query("SELECT * FROM incidentes ORDER BY fecha DESC", conn)
     st.dataframe(df, use_container_width=True)
+    excel_data = exportar_excel(df, "incidentes")
+    st.download_button("Exportar a Excel", data=excel_data, file_name=f"incidentes_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
+# ========== MATRIZ LEGAL ==========
 elif menu == "Matriz Legal":
-    crear_tablas_nuevas()
-    pagina_matriz_legal()
+    st.header("Matriz Legal")
+    df = pd.read_sql_query("SELECT * FROM matriz_legal", conn)
+    st.dataframe(df, use_container_width=True)
 
+# ========== AUDITORIAS ==========
 elif menu == "Auditorias":
-    crear_tablas_nuevas()
-    pagina_auditorias()
+    st.header("Auditorias")
+    df = pd.read_sql_query("SELECT * FROM auditorias", conn)
+    st.dataframe(df, use_container_width=True)
 
+# ========== PLAN ANUAL ==========
 elif menu == "Plan Anual":
-    crear_tablas_nuevas()
-    pagina_plan_anual()
+    st.header("Plan Anual")
+    df = pd.read_sql_query("SELECT * FROM plan_anual", conn)
+    st.dataframe(df, use_container_width=True)
 
+# ========== CHAT IA ==========
 elif menu == "Chat IA":
     st.title("Chat IA")
     if "messages" not in st.session_state:
