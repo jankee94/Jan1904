@@ -6,38 +6,53 @@ load_dotenv()
 
 class Settings:
     # App
-    APP_NAME = os.getenv("APP_NAME", "SG-SST PHVA")
-    APP_ENV = os.getenv("APP_ENV", "development")
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
+    APP_NAME = "SG-SST PHVA"
+    APP_VERSION = "3.0.0"
+    APP_ENV = os.getenv("APP_ENV", "production")
     
     # Firebase
-    FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
-    FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "programa-sst")
+    FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "")
+    FIREBASE_AUTH_DOMAIN = os.getenv("FIREBASE_AUTH_DOMAIN", "")
+    FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+    FIREBASE_MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID", "")
+    FIREBASE_APP_ID = os.getenv("FIREBASE_APP_ID", "")
     
-    # APIs
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-    
-    # Collections
+    # Collections Firestore
     COLLECTIONS = {
         "usuarios": "usuarios",
+        "empresas": "empresas",
         "trabajadores": "trabajadores",
-        "incidentes": "incidentes",
         "peligros": "peligros",
-        "capacitaciones": "capacitaciones",
-        "auditorias": "auditorias",
-        "plan_anual": "plan_anual",
-        "politicas_sst": "politicas_sst",
+        "acciones": "acciones",
+        "incidentes": "incidentes",
         "matriz_legal": "matriz_legal",
-        "plan_emergencias": "plan_emergencias",
-        "auditoria_cambios": "auditoria_cambios",
+        "auditorias": "auditorias",
+        "planes_anuales": "planes_anuales",
+        "capacitaciones": "capacitaciones",
+        "inspecciones": "inspecciones",
+        "emergencias": "emergencias",
+        "documentos": "documentos",
+        "indicadores": "indicadores",
+        "logs": "logs",
         "configuracion": "configuracion"
     }
     
     # Roles
-    ROLES = ["admin", "responsable_sst", "supervisor", "trabajador", "auditor"]
+    ROLES = {
+        "admin": ["todos"],
+        "responsable_sst": ["peligros", "acciones", "trabajadores", "incidentes", "matriz_legal", "capacitaciones", "inspecciones"],
+        "auditor": ["auditorias", "matriz_legal", "incidentes"],
+        "jefe_area": ["trabajadores", "incidentes", "inspecciones"],
+        "trabajador": ["incidentes", "capacitaciones"]
+    }
     
-    # Pagination
+    # Paginación
     PAGE_SIZE = 20
-
+    MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+    
+    # IA
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    
 settings = Settings()

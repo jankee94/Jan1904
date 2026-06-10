@@ -1,0 +1,1 @@
+from modules.capacitaciones.ui import render_capacitaciones

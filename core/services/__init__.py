@@ -1,0 +1,1 @@
+from core.services.capacitacion_service import capacitacion_service

@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+    
+    // Evidencias
+    match /evidencias/{empresaId}/{documentId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Perfiles
+    match /perfiles/{userId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Documentos públicos
+    match /publicos/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
