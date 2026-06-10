@@ -56,9 +56,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-from datetime import datetime, timedelta
+    return {} from datetime import datetime, timedelta
 import json
 import sqlite3
 import pandas as pd
@@ -118,9 +116,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-from datetime import datetime
+    return {} from datetime import datetime
 
 
 # ============================================
@@ -175,13 +171,10 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-
-st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
+    return {} st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
 # CSS
-st.markdown("""
+st.markdown('
 <style>
     .stApp { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
     header[data-testid="stHeader"] { display: none; }
@@ -240,9 +233,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-    .stButton > button {
+    return {} .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 
 
@@ -298,9 +289,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-        border: none !important;
+    return {} border: none !important;
 
 
 # ============================================
@@ -355,9 +344,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-        border-radius: 12px !important;
+    return {} border-radius: 12px !important;
 
 
 # ============================================
@@ -412,9 +399,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-        font-weight: 600 !important;
+    return {} font-weight: 600 !important;
 
 
 # ============================================
@@ -469,15 +454,13 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-    }
+    return {} }
     [data-testid="stSidebar"] {
         background: rgba(20, 20, 40, 0.5);
         backdrop-filter: blur(10px);
     }
 </style>
-""", unsafe_allow_html=True)
+', unsafe_allow_html=True)
 
 # ========== IA CON MULTIPLES KEYS ==========
 def get_gemini_keys():
@@ -599,12 +582,12 @@ if "empresa_actual_id" not in st.session_state:
 if not st.session_state.auth:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        st.markdown("""
+        st.markdown('
         <div style="background: rgba(20,20,40,0.75); backdrop-filter: blur(14px); border-radius: 28px; padding: 35px; text-align:center">
             <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="65">
             <h1 style="color:white; font-size:24px; margin:10px 0">SG-SST PHVA</h1>
             <p style="color:rgba(255,255,255,0.6); font-size:12px">✨ Seguridad y Salud, compromiso de todos ✨</p>
-        """, unsafe_allow_html=True)
+        ', unsafe_allow_html=True)
         
         with st.form("login_form"):
             username = st.text_input("Usuario", placeholder="Ingrese su usuario")
@@ -618,12 +601,12 @@ if not st.session_state.auth:
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
         
-        st.markdown("""
+        st.markdown('
             <div style="margin-top:20px; font-size:10px; color:rgba(255,255,255,0.3)">
                 🛡️ SG-SST PHVA | Desarrollado por JAN BENITEZ
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        ', unsafe_allow_html=True)
     st.stop()
 
 # ========== SIDEBAR ==========
@@ -1101,8 +1084,7 @@ def pagina_realizar_auditoria():
     
     st.subheader("Checklist ISO 45001")
     
-    respuestas = {}
-    for idx, row in preguntas_df.iterrows():
+    respuestas = {} for idx, row in preguntas_df.iterrows():
         with st.container():
             col1, col2 = st.columns([3,1])
             with col1:
@@ -1131,7 +1113,7 @@ def pagina_realizar_auditoria():
                 puntuacion_total += peso
             # Guardar hallazgo
             c.execute("INSERT INTO hallazgos (auditoria_id, checklist_id, tipo, comentario) VALUES (?,?,?,?)",
-                     (auditoria_id, pregunta_id, respuesta.lower().replace(" ", "_"), ""))
+                     (auditoria_id, pregunta_id, respuesta.lower().replace(" ", "_"), '))
         
         porcentaje = (puntuacion_total / peso_total) * 100
         
@@ -1331,9 +1313,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-# ============================================
+    return {} # ============================================
 import io
 import base64
 
@@ -1390,9 +1370,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-from fpdf import FPDF
+    return {} from fpdf import FPDF
 import docx
 
 
@@ -1448,9 +1426,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-from docx.shared import Inches
+    return {} from docx.shared import Inches
 import tempfile
 import time
 
@@ -1507,9 +1483,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-from concurrent.futures import ThreadPoolExecutor
+    return {} from concurrent.futures import ThreadPoolExecutor
 
 
 # ============================================
@@ -1564,10 +1538,7 @@ def get_empresa_data():
             'telefono': data[5],
             'email': data[6]
         }
-    return {}
-
-
-# ============================================
+    return {} # ============================================
 # FUNCIÓN PARA DATOS DE LA EMPRESA (GLOBAL)
 # ============================================
 
