@@ -421,7 +421,7 @@ with st.sidebar:
         "🔍 Auditorias",
         "📅 Plan Anual",
         "💬 Chat IA"
-    ])
+    ], "📊 Informes")
     
     st.markdown("---")
     if st.button("🚪 Cerrar Sesion", use_container_width=True):
