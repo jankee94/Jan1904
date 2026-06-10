@@ -2,13 +2,181 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
 from datetime import datetime, timedelta
 import json
 import sqlite3
 import pandas as pd
 import requests
 import itertools
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
 from datetime import datetime
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -18,11 +186,291 @@ st.markdown("""
     .stApp { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
     header[data-testid="stHeader"] { display: none; }
     footer { display: none !important; }
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
         border: none !important;
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
         border-radius: 12px !important;
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
         font-weight: 600 !important;
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
     }
     [data-testid="stSidebar"] {
         background: rgba(20, 20, 40, 0.5);
@@ -829,18 +1277,10 @@ def pagina_plan_anual():
 
 # ============================================
 # NUEVAS IMPORTACIONES
-# ============================================
-import io
-import base64
-from fpdf import FPDF
-import docx
-from docx.shared import Inches
-import tempfile
-import time
-from concurrent.futures import ThreadPoolExecutor
+
 
 # ============================================
-# FUNCIÓN PARA DATOS DE LA EMPRESA (GLOBAL)
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
 # ============================================
 
 def init_empresa_data():
@@ -892,6 +1332,245 @@ def get_empresa_data():
             'email': data[6]
         }
     return {}
+
+# ============================================
+import io
+import base64
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
+from fpdf import FPDF
+import docx
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
+from docx.shared import Inches
+import tempfile
+import time
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
+from concurrent.futures import ThreadPoolExecutor
+
+
+# ============================================
+# FUNCIONES DE CONFIGURACIÓN DE EMPRESA (MOVER AL INICIO)
+# ============================================
+
+def init_empresa_data():
+    """Inicializar o obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    
+    # Crear tabla de empresa si no existe
+    c.execute('''CREATE TABLE IF NOT EXISTS empresa_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        nit TEXT,
+        ubicacion TEXT,
+        ciudad TEXT,
+        sector TEXT,
+        telefono TEXT,
+        email TEXT,
+        logo TEXT,
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    # Verificar si ya hay datos
+    c.execute("SELECT COUNT(*) FROM empresa_config")
+    if c.fetchone()[0] == 0:
+        c.execute('''INSERT INTO empresa_config 
+                   (nombre, nit, ubicacion, ciudad, sector, telefono, email) 
+                   VALUES (?,?,?,?,?,?,?)''',
+                  ('Mi Empresa SAS', '900.000.000-1', 'Calle 123 #45-67', 'Bogotá', 
+                   'Servicios', '601 1234567', 'contacto@miempresa.com'))
+        conn.commit()
+    
+    conn.close()
+
+def get_empresa_data():
+    """Obtener datos de la empresa"""
+    conn = sqlite3.connect('sst.db')
+    c = conn.cursor()
+    c.execute("SELECT nombre, nit, ubicacion, ciudad, sector, telefono, email FROM empresa_config LIMIT 1")
+    data = c.fetchone()
+    conn.close()
+    if data:
+        return {
+            'nombre': data[0],
+            'nit': data[1],
+            'ubicacion': data[2],
+            'ciudad': data[3],
+            'sector': data[4],
+            'telefono': data[5],
+            'email': data[6]
+        }
+    return {}
+
+
+# ============================================
+# FUNCIÓN PARA DATOS DE LA EMPRESA (GLOBAL)
+# ============================================
+
 
 def pagina_configuracion_empresa():
     """Página de configuración de la empresa"""
