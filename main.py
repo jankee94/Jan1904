@@ -10,9 +10,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== IA CON MODELOS CORRECTOS ==========
+# ========== IA CON MODELOS ACTIVOS ==========
 
-# Gemini - modelo que SÍ funciona con tu key (usando gemini-pro)
+# Gemini - modelo activo: gemini-2.0-flash-exp
 def call_gemini():
     try:
         key = st.secrets.get("GEMINI_API_KEY_1")
@@ -21,8 +21,8 @@ def call_gemini():
         if not key:
             return "No hay Gemini key"
         
-        # Modelo que SÍ funciona: gemini-pro (no gemini-1.5-pro)
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+        # Modelo activo de Gemini
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
         headers = {"Content-Type": "application/json", "x-goog-api-key": key}
         data = {"contents": [{"parts": [{"text": "Responde solo: OK"}]}]}
         
@@ -36,7 +36,7 @@ def call_gemini():
     except Exception as e:
         return f"❌ Error: {e}"
 
-# Groq - con modelo correcto
+# Groq - modelo activo: llama-3.3-70b-specdec
 def call_groq():
     try:
         key = st.secrets.get("GROQ_API_KEY")
@@ -45,7 +45,7 @@ def call_groq():
         
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        data = {"model": "mixtral-8x7b-32768", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
+        data = {"model": "llama-3.3-70b-specdec", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
         
         r = requests.post(url, json=data, headers=headers, timeout=30)
         
@@ -63,7 +63,7 @@ def chat_gemini(pregunta):
         if not key:
             key = st.secrets.get("GEMINI_API_KEY")
         
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
         headers = {"Content-Type": "application/json", "x-goog-api-key": key}
         data = {"contents": [{"parts": [{"text": f"Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia. Responde de forma clara y profesional: {pregunta}"}]}]}
         
@@ -109,7 +109,7 @@ if menu == "Dashboard":
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Probar Gemini", use_container_width=True):
+        if st.button("🔌 Probar Gemini", use_container_width=True):
             with st.spinner("Probando Gemini..."):
                 r = call_gemini()
                 if "✅" in r:
@@ -118,7 +118,7 @@ if menu == "Dashboard":
                 else:
                     st.error(r)
     with col2:
-        if st.button("Probar Groq", use_container_width=True):
+        if st.button("🔌 Probar Groq", use_container_width=True):
             with st.spinner("Probando Groq..."):
                 r = call_groq()
                 if "✅" in r:
@@ -128,7 +128,7 @@ if menu == "Dashboard":
                     st.error(r)
     
     st.markdown("---")
-    st.info("Gemini: gemini-pro | Groq: mixtral-8x7b-32768")
+    st.info("Gemini: gemini-2.0-flash-exp | Groq: llama-3.3-70b-specdec")
 
 elif menu == "Chat IA":
     st.markdown('<div class="main-header"><h1>Chat IA</h1></div>', unsafe_allow_html=True)
