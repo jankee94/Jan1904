@@ -2,7 +2,7 @@
 import streamlit as st
 from google.cloud import firestore
 from google.oauth2 import service_account
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 import json
 
@@ -27,17 +27,13 @@ class FirestoreClient:
     def _init_firestore(self):
         """Inicializar conexión a Firestore"""
         try:
-            # Intentar usar credenciales de Streamlit secrets
             if st.secrets.get("FIREBASE_CREDENTIALS"):
                 cred_dict = json.loads(st.secrets["FIREBASE_CREDENTIALS"])
                 credentials = service_account.Credentials.from_service_account_info(cred_dict)
                 self.db = firestore.Client(credentials=credentials, project=cred_dict.get("project_id"))
-            else:
-                # Usar credenciales locales
-                self.db = firestore.Client()
-            st.success("✅ Conectado a Firestore")
+                st.success("✅ Conectado a Firestore")
         except Exception as e:
-            st.error(f"❌ Error conectando a Firestore: {e}")
+            st.warning(f"⚠️ Firestore no disponible: {e}")
             self.db = None
     
     def get_collection(self, collection_name: str):

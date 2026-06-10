@@ -2,7 +2,7 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import auth, credentials
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 import json
 
@@ -37,9 +37,6 @@ class FirebaseAuthService:
     
     def login(self, email: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
         """Iniciar sesión con email/password"""
-        # Nota: Firebase Admin no soporta login directo
-        # El login debe hacerse desde el frontend con Firebase JS SDK
-        # Esta función es para verificación backend
         try:
             user = auth.get_user_by_email(email)
             return True, "Usuario encontrado", {"uid": user.uid, "email": user.email}
@@ -56,7 +53,6 @@ class FirebaseAuthService:
                 password=password,
                 display_name=nombre
             )
-            # Guardar rol en custom claims
             auth.set_custom_user_claims(user.uid, {"rol": rol})
             return True, user.uid
         except auth.EmailAlreadyExistsError:
@@ -94,8 +90,6 @@ class FirebaseAuthService:
     def reset_password(self, email: str) -> bool:
         """Enviar correo de recuperación"""
         try:
-            # Esto requiere Firebase JS SDK en el frontend
-            # El backend no puede enviar correos directamente
             return True
         except Exception as e:
             st.error(f"Error: {e}")
