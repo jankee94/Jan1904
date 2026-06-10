@@ -539,4 +539,191 @@ elif menu == "💬 Chat IA":
                 st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
 st.markdown("---")
+
+# ============================================
+# FUNCIÓN PARA VISTA PREVIA DE INFORME
+# ============================================
+
+def mostrar_vista_previa_informe():
+    """Muestra una vista previa del informe antes de descargar"""
+    st.subheader("📄 VISTA PREVIA DEL INFORME SST")
+    
+    # Obtener datos
+    peligros_df = get_peligros()
+    acciones_df = get_acciones()
+    trabajadores_df = get_trabajadores()
+    incidentes_df = get_incidentes()
+    empresa = get_empresa()
+    
+    # Fecha del informe
+    fecha_informe = datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    # ========== ENCABEZADO ==========
+    st.markdown(f'''
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; margin-bottom: 20px;">
+        <h2 style="color: white; margin: 0;">INFORME SG-SST PHVA</h2>
+        <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0;">Generado: {fecha_informe}</p>
+    </div>
+    ''', unsafe_allow_html=True)
+    
+    # ========== DATOS DE LA EMPRESA ==========
+    with st.expander("🏢 DATOS DE LA EMPRESA", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Nombre", empresa.get('nombre', 'No registrado'))
+            st.metric("NIT", empresa.get('nit', 'No registrado'))
+        with col2:
+            st.metric("Ubicación", empresa.get('ubicacion', 'No registrado'))
+            st.metric("Ciudad", empresa.get('ciudad', 'No registrado'))
+        with col3:
+            st.metric("Sector", empresa.get('sector', 'No registrado'))
+            st.metric("Teléfono", empresa.get('telefono', 'No registrado'))
+    
+    # ========== RESUMEN GENERAL ==========
+    st.subheader("📊 RESUMEN GENERAL")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("⚠️ Peligros", len(peligros_df), delta="Identificados")
+    with col2:
+        completadas = len(acciones_df[acciones_df['estado'] == 'Completada']) if not acciones_df.empty else 0
+        st.metric("✅ Acciones", f"{completadas}/{len(acciones_df)}", delta="En progreso")
+    with col3:
+        st.metric("👥 Trabajadores", len(trabajadores_df))
+    with col4:
+        st.metric("📝 Incidentes", len(incidentes_df))
+    
+    # ========== GRÁFICOS ==========
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("⚠️ Peligros por Nivel de Riesgo")
+        if not peligros_df.empty:
+            niveles = peligros_df['nivel'].value_counts()
+            fig_niveles = go.Figure(data=[go.Bar(
+                x=niveles.index, 
+                y=niveles.values,
+                marker_color=['#dc2626', '#f59e0b', '#10b981']
+            )])
+            fig_niveles.update_layout(height=300, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_niveles, use_container_width=True)
+        else:
+            st.info("No hay datos de peligros")
+    
+    with col2:
+        st.subheader("📝 Incidentes por Gravedad")
+        if not incidentes_df.empty:
+            gravedades = incidentes_df['gravedad'].value_counts()
+            fig_grav = go.Figure(data=[go.Pie(
+                labels=gravedades.index,
+                values=gravedades.values,
+                marker_colors=['#dc2626', '#f59e0b', '#10b981']
+            )])
+            fig_grav.update_layout(height=300, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_grav, use_container_width=True)
+        else:
+            st.info("No hay datos de incidentes")
+    
+    # ========== TABLAS DE DATOS ==========
+    tabs = st.tabs(["⚠️ Peligros", "✅ Acciones", "👥 Trabajadores", "📝 Incidentes"])
+    
+    with tabs[0]:
+        if not peligros_df.empty:
+            st.dataframe(peligros_df[['tipo', 'descripcion', 'probabilidad', 'severidad', 'nivel']].head(10), use_container_width=True)
+            if len(peligros_df) > 10:
+                st.caption(f"Mostrando 10 de {len(peligros_df)} registros")
+        else:
+            st.info("No hay peligros registrados")
+    
+    with tabs[1]:
+        if not acciones_df.empty:
+            st.dataframe(acciones_df[['descripcion', 'responsable', 'fecha_limite', 'estado']].head(10), use_container_width=True)
+        else:
+            st.info("No hay acciones registradas")
+    
+    with tabs[2]:
+        if not trabajadores_df.empty:
+            st.dataframe(trabajadores_df[['nombre', 'cedula', 'cargo', 'area']].head(10), use_container_width=True)
+        else:
+            st.info("No hay trabajadores registrados")
+    
+    with tabs[3]:
+        if not incidentes_df.empty:
+            st.dataframe(incidentes_df[['descripcion', 'fecha', 'gravedad', 'causa']].head(10), use_container_width=True)
+        else:
+            st.info("No hay incidentes registrados")
+    
+    # ========== INDICADORES SST ==========
+    st.subheader("📈 INDICADORES SST")
+    
+    if not incidentes_df.empty and not trabajadores_df.empty:
+        # Calcular índices
+        total_incidentes = len(incidentes_df)
+        total_trabajadores = len(trabajadores_df)
+        indice_frecuencia = (total_incidentes * 1000) / total_trabajadores if total_trabajadores > 0 else 0
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Índice de Frecuencia", f"{indice_frecuencia:.1f}", delta="Incidentes x 1000 trabajadores")
+        with col2:
+            # Porcentaje de acciones completadas
+            if not acciones_df.empty:
+                pct_completadas = (len(acciones_df[acciones_df['estado'] == 'Completada']) / len(acciones_df)) * 100
+                st.metric("Cumplimiento Plan", f"{pct_completadas:.0f}%", delta="Acciones completadas")
+            else:
+                st.metric("Cumplimiento Plan", "0%")
+        with col3:
+            # Riesgo predominante
+            if not peligros_df.empty:
+                riesgo_alto = len(peligros_df[peligros_df['nivel'] == 'I'])
+                st.metric("Riesgos Altos", riesgo_alto, delta="Requieren atención inmediata")
+            else:
+                st.metric("Riesgos Altos", "0")
+    
+    # ========== RECOMENDACIONES IA ==========
+    st.subheader("🤖 RECOMENDACIONES IA")
+    with st.spinner("Generando recomendaciones..."):
+        recomendaciones = call_best_ia(f"""
+        Basado en el siguiente resumen SST de la empresa {empresa.get('nombre', '')}:
+        - Peligros identificados: {len(peligros_df)}
+        - Acciones: {len(acciones_df)}
+        - Incidentes reportados: {len(incidentes_df)}
+        - Trabajadores: {len(trabajadores_df)}
+        
+        Genera 5 recomendaciones prioritarias para mejorar el SG-SST.
+        """)
+        if recomendaciones:
+            st.info(recomendaciones)
+        else:
+            st.warning("No se pudieron generar recomendaciones automáticas")
+    
+    # ========== FOOTER ==========
+    st.markdown("---")
+    st.caption(f"Informe generado automáticamente por SG-SST PHVA - {fecha_informe}")
+
+def generar_informe_completo():
+    """Genera el informe completo para descargar (Excel)"""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Datos empresa
+        empresa = get_empresa()
+        empresa_df = pd.DataFrame([empresa])
+        empresa_df.to_excel(writer, sheet_name='Datos_Empresa', index=False)
+        
+        # Peligros
+        get_peligros().to_excel(writer, sheet_name='Peligros', index=False)
+        
+        # Acciones
+        get_acciones().to_excel(writer, sheet_name='Acciones', index=False)
+        
+        # Trabajadores
+        get_trabajadores().to_excel(writer, sheet_name='Trabajadores', index=False)
+        
+        # Incidentes
+        get_incidentes().to_excel(writer, sheet_name='Incidentes', index=False)
+        
+        # Matriz Legal
+        get_matriz_legal().to_excel(writer, sheet_name='Matriz_Legal', index=False)
+    return output.getvalue()
+
+
 st.markdown("<p style='text-align:center; font-size:12px; color:rgba(255,255,255,0.4)'>🔄 SG-SST PHVA | Sistema de Gestión PHVA con IA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
