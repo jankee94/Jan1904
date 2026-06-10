@@ -5,6 +5,7 @@ import requests
 import itertools
 from datetime import datetime
 import io
+import json
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -23,6 +24,14 @@ st.markdown('''
     [data-testid="stSidebar"] {
         background: rgba(20, 20, 40, 0.5);
         backdrop-filter: blur(10px);
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 8px 16px;
     }
 </style>
 ''', unsafe_allow_html=True)
@@ -87,22 +96,22 @@ def call_best_ia(prompt):
     respuesta = call_groq(prompt)
     if respuesta:
         return respuesta
-    return "⚠️ No se pudo obtener respuesta de ninguna IA."
+    return "⚠️ IA no disponible en este momento"
 
 # ========== BASE DE DATOS ==========
 conn = sqlite3.connect("sst.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tablas
+# Tablas principales
 cursor.execute('''CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, nombre TEXT, rol TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, tipo TEXT, descripcion TEXT, probabilidad INTEGER, severidad INTEGER, nivel TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, responsable TEXT, fecha TEXT, estado TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, nombre TEXT, cedula TEXT, cargo TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, fecha TEXT, gravedad TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS peligros (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, tipo TEXT, descripcion TEXT, probabilidad INTEGER, severidad INTEGER, nivel TEXT, fecha_registro TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS acciones (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, responsable TEXT, fecha_limite TEXT, estado TEXT, fecha_registro TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS trabajadores (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, nombre TEXT, cedula TEXT, cargo TEXT, area TEXT, fecha_registro TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS incidentes (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, descripcion TEXT, fecha TEXT, gravedad TEXT, causa TEXT, fecha_registro TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_legal (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, norma TEXT, articulo TEXT, requisito TEXT, cumple INTEGER, responsable TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS auditorias (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, codigo TEXT, fecha TEXT, auditor_id TEXT, puntuacion INTEGER, estado TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS plan_anual (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, anio INTEGER, mes INTEGER, actividad TEXT, responsable TEXT, presupuesto REAL, cumplimiento INTEGER)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS empresa_config (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, nit TEXT, ubicacion TEXT, ciudad TEXT, sector TEXT, telefono TEXT, email TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS matriz_legal (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, norma TEXT, articulo TEXT, requisito TEXT, cumple INTEGER)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS auditorias (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, codigo TEXT, fecha TEXT, auditor_id TEXT, puntuacion INTEGER)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS plan_anual (id INTEGER PRIMARY KEY AUTOINCREMENT, empresa_id INTEGER, anio INTEGER, actividad TEXT, mes_programado INTEGER, responsable TEXT, cumplimiento INTEGER)''')
 
 # Usuario admin
 cursor.execute("SELECT * FROM usuarios WHERE username='admin'")
@@ -110,10 +119,11 @@ if not cursor.fetchone():
     cursor.execute("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?,?,?,?)", ('admin', 'admin123', 'Administrador', 'admin'))
     conn.commit()
 
-# Datos empresa por defecto
+# Configuración empresa por defecto
 cursor.execute("SELECT COUNT(*) FROM empresa_config")
 if cursor.fetchone()[0] == 0:
-    cursor.execute("INSERT INTO empresa_config (nombre, nit, ubicacion, ciudad, sector, telefono, email) VALUES (?,?,?,?,?,?,?)", ('Mi Empresa SAS', '900.000.000-1', 'Calle 123', 'Bogota', 'Servicios', '6011234567', 'contacto@miempresa.com'))
+    cursor.execute("INSERT INTO empresa_config (nombre, nit, ubicacion, ciudad, sector, telefono, email) VALUES (?,?,?,?,?,?,?)", 
+                  ('Constructora Segura SAS', '901.234.567-8', 'Calle 80 #45-67', 'Bogota', 'Construccion', '6015551234', 'sst@constructora.com'))
     conn.commit()
 
 conn.commit()
@@ -121,50 +131,244 @@ conn.commit()
 def verificar_login(username, password):
     cursor.execute("SELECT * FROM usuarios WHERE username=? AND password=?", (username, password))
     user = cursor.fetchone()
-    if user:
-        return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]}
-    return None
+    return {"id": user[0], "username": user[1], "nombre": user[3], "rol": user[4]} if user else None
 
-def get_empresa_data():
+def get_empresa():
     cursor.execute("SELECT nombre, nit, ubicacion, ciudad, sector FROM empresa_config LIMIT 1")
     data = cursor.fetchone()
-    if data:
-        return {"nombre": data[0], "nit": data[1], "ubicacion": data[2], "ciudad": data[3], "sector": data[4]}
-    return {}
+    return {"nombre": data[0], "nit": data[1], "ubicacion": data[2], "ciudad": data[3], "sector": data[4]} if data else {}
 
-# ========== DATOS DE PRUEBA ==========
-def cargar_datos_prueba():
-    with st.spinner("Cargando datos de prueba..."):
-        cursor.execute("SELECT COUNT(*) FROM peligros")
-        if cursor.fetchone()[0] == 0:
-            # Peligros
-            peligros = [("Fisico", "Ruido excesivo", 3, 2, "II"), ("Ergonomico", "Posturas prolongadas", 2, 2, "II"), ("Quimico", "Exposicion a solventes", 2, 3, "I")]
-            for p in peligros:
-                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel) VALUES (1,?,?,?,?,?)", p)
-            # Acciones
-            acciones = [("Implementar barreras acusticas", "Coordinador SST", "2024-12-15", "En progreso"), ("Capacitacion pausas activas", "SST", "2024-11-30", "Pendiente")]
-            for a in acciones:
-                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha, estado) VALUES (1,?,?,?,?)", a)
-            # Trabajadores
-            trabajadores = [("Carlos Lopez", "12345678", "Operario"), ("Maria Gomez", "87654321", "Supervisor")]
-            for t in trabajadores:
-                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo) VALUES (1,?,?,?)", t)
-            # Incidentes
-            incidentes = [("Caida desde altura", "2024-10-15", "Grave"), ("Corte con herramienta", "2024-10-20", "Leve")]
-            for i in incidentes:
-                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad) VALUES (1,?,?,?)", i)
-            conn.commit()
-            st.success("Datos de prueba cargados!")
-            st.balloons()
-        else:
-            st.info("Ya hay datos en el sistema")
-
-# ========== EXPORTAR ==========
-def exportar_excel(df, nombre):
+# ========== FUNCIONES DE IMPORTAR/EXPORTAR ==========
+def exportar_excel(df, nombre_modulo):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name=nombre, index=False)
+        df.to_excel(writer, sheet_name=nombre_modulo, index=False)
     return output.getvalue()
+
+def importar_excel(uploaded_file, tabla, columnas_requeridas, mapeo=None):
+    try:
+        df = pd.read_excel(uploaded_file)
+        # Verificar columnas
+        missing = [col for col in columnas_requeridas if col not in df.columns]
+        if missing:
+            return False, f"Faltan columnas: {missing}", None
+        # Insertar datos
+        fecha_reg = datetime.now().strftime("%Y-%m-%d")
+        for _, row in df.iterrows():
+            if tabla == "peligros":
+                cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel, fecha_registro) VALUES (1,?,?,?,?,?,?)",
+                              (row['tipo'], row['descripcion'], int(row['probabilidad']), int(row['severidad']), row.get('nivel', 'II'), fecha_reg))
+            elif tabla == "acciones":
+                cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha_limite, estado, fecha_registro) VALUES (1,?,?,?,?,?)",
+                              (row['descripcion'], row['responsable'], row['fecha_limite'], row.get('estado', 'Pendiente'), fecha_reg))
+            elif tabla == "trabajadores":
+                cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo, area, fecha_registro) VALUES (1,?,?,?,?,?)",
+                              (row['nombre'], row['cedula'], row['cargo'], row.get('area', 'General'), fecha_reg))
+            elif tabla == "incidentes":
+                cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad, causa, fecha_registro) VALUES (1,?,?,?,?,?)",
+                              (row['descripcion'], row['fecha'], row['gravedad'], row.get('causa', 'En investigacion'), fecha_reg))
+        conn.commit()
+        return True, f"{len(df)} registros importados", df
+    except Exception as e:
+        return False, f"Error: {str(e)}", None
+
+def analizar_con_ia(datos, tipo):
+    prompt = f"""
+    Eres un experto en SST. Analiza los siguientes datos del módulo {tipo}:
+    
+    {datos}
+    
+    Genera un análisis breve con:
+    1. Calidad de los datos
+    2. Riesgos identificados
+    3. Recomendaciones
+    """
+    return call_best_ia(prompt)
+
+# ========== DATOS DE PRUEBA COMPLETOS ==========
+def cargar_datos_prueba():
+    with st.spinner("Cargando datos de prueba simulados..."):
+        # Limpiar datos existentes
+        cursor.execute("DELETE FROM peligros")
+        cursor.execute("DELETE FROM acciones")
+        cursor.execute("DELETE FROM trabajadores")
+        cursor.execute("DELETE FROM incidentes")
+        cursor.execute("DELETE FROM matriz_legal")
+        
+        fecha = datetime.now().strftime("%Y-%m-%d")
+        
+        # PELIGROS (10 registros)
+        peligros_data = [
+            ("Fisico", "Ruido excesivo en zona de maquinaria pesada", 4, 3, "I"),
+            ("Fisico", "Vibraciones en equipos de perforacion", 3, 2, "II"),
+            ("Ergonomico", "Posturas forzadas en area de oficinas", 3, 2, "II"),
+            ("Quimico", "Exposicion a solventes en taller de pintura", 2, 3, "I"),
+            ("Psicosocial", "Estrés laboral por altas cargas de trabajo", 3, 2, "II"),
+            ("Seguridad", "Andamios sin proteccion en altura", 4, 3, "I"),
+            ("Biologico", "Exposicion a hongos en areas humedas", 2, 2, "II"),
+            ("Fisico", "Iluminacion insuficiente en bodega", 2, 2, "II"),
+            ("Ergonomico", "Levantamiento manual de cargas", 3, 2, "II"),
+            ("Quimico", "Polvo de silice en area de corte", 3, 3, "I"),
+        ]
+        for p in peligros_data:
+            cursor.execute("INSERT INTO peligros (empresa_id, tipo, descripcion, probabilidad, severidad, nivel, fecha_registro) VALUES (1,?,?,?,?,?,?)", 
+                          (p[0], p[1], p[2], p[3], p[4], fecha))
+        
+        # ACCIONES (8 registros)
+        acciones_data = [
+            ("Implementar barreras acusticas en zona de maquinaria", "Coordinador SST", "2025-01-15", "En progreso"),
+            ("Capacitacion en pausas activas", "SST", "2024-12-10", "Pendiente"),
+            ("Instalar extractores de aire en taller", "Mantenimiento", "2024-12-20", "Pendiente"),
+            ("Evaluacion de cargas laborales", "Psicologia", "2025-01-05", "En progreso"),
+            ("Instalar barandas en andamios", "Seguridad", "2024-11-30", "Completada"),
+            ("Estudio de iluminacion en bodega", "Infraestructura", "2025-01-20", "Pendiente"),
+            ("Compra de equipos de proteccion", "Compras", "2024-12-15", "En progreso"),
+            ("Simulacro de emergencia", "SST", "2025-01-25", "Planificada"),
+        ]
+        for a in acciones_data:
+            cursor.execute("INSERT INTO acciones (empresa_id, descripcion, responsable, fecha_limite, estado, fecha_registro) VALUES (1,?,?,?,?,?)", 
+                          (a[0], a[1], a[2], a[3], fecha))
+        
+        # TRABAJADORES (15 registros)
+        trabajadores_data = [
+            ("Carlos Lopez", "12345678", "Operario", "Produccion"),
+            ("Maria Gomez", "87654321", "Supervisor", "Produccion"),
+            ("Juan Perez", "11122233", "Coordinador SST", "SST"),
+            ("Ana Rodriguez", "44455566", "Auxiliar", "Administracion"),
+            ("Luis Martinez", "77788899", "Jefe de produccion", "Produccion"),
+            ("Sofia Ramirez", "99900011", "Ingeniero", "Ingenieria"),
+            ("Pedro Sanchez", "22233344", "Operario", "Produccion"),
+            ("Laura Fernandez", "55566677", "Secretaria", "Administracion"),
+            ("Andres Torres", "88899900", "Tecnico", "Mantenimiento"),
+            ("Carolina Diaz", "11122233", "Enfermera", "Salud"),
+            ("Jorge Mora", "33344455", "Conductor", "Logistica"),
+            ("Diana Rios", "66677788", "Almacenista", "Logistica"),
+            ("Ricardo Pardo", "99900011", "Vigilante", "Seguridad"),
+            ("Patricia Vega", "22211133", "Limpieza", "Servicios"),
+            ("Fernando Castro", "55544466", "Supervisor", "Mantenimiento"),
+        ]
+        for t in trabajadores_data:
+            cursor.execute("INSERT INTO trabajadores (empresa_id, nombre, cedula, cargo, area, fecha_registro) VALUES (1,?,?,?,?,?)", 
+                          (t[0], t[1], t[2], t[3], fecha))
+        
+        # INCIDENTES (10 registros)
+        incidentes_data = [
+            ("Caida desde andamio de 3m", "2024-10-15", "Grave", "Falta de barandas"),
+            ("Corte con herramienta manual", "2024-10-20", "Leve", "Falta de entrenamiento"),
+            ("Exposicion a quimicos", "2024-11-01", "Moderada", "Falta de EPP"),
+            ("Golpe con maquinaria", "2024-11-10", "Leve", "Distraccion"),
+            ("Incendio en taller", "2024-11-15", "Grave", "Corto circuito"),
+            ("Resbalon en piso humedo", "2024-11-20", "Leve", "Senalizacion insuficiente"),
+            ("Caida de objeto", "2024-11-25", "Moderada", "Mal almacenamiento"),
+            ("Intoxicacion por humos", "2024-12-01", "Moderada", "Ventilacion deficiente"),
+            ("Atrapamiento", "2024-12-05", "Grave", "Falta de guardas"),
+            ("Sobreesfuerzo", "2024-12-10", "Leve", "Mala postura"),
+        ]
+        for i in incidentes_data:
+            cursor.execute("INSERT INTO incidentes (empresa_id, descripcion, fecha, gravedad, causa, fecha_registro) VALUES (1,?,?,?,?,?)", 
+                          (i[0], i[1], i[2], i[3], fecha))
+        
+        # MATRIZ LEGAL (8 registros)
+        legal_data = [
+            ("ISO 45001", "4.1", "Contexto de la organizacion", 0, "Gerente"),
+            ("ISO 45001", "5.2", "Politica de SST", 0, "Gerente"),
+            ("ISO 45001", "6.1.2", "Identificacion de peligros", 1, "SST"),
+            ("Decreto 1072", "2.2.4.6.22", "COPASST", 0, "Gerente"),
+            ("Decreto 1072", "2.2.4.6.16", "Examenes medicos", 1, "SST"),
+            ("ISO 45001", "7.2", "Competencia", 0, "SST"),
+            ("ISO 45001", "8.2", "Preparacion emergencias", 0, "SST"),
+            ("ISO 45001", "9.2", "Auditorias internas", 0, "Auditor"),
+        ]
+        for l in legal_data:
+            cursor.execute("INSERT INTO matriz_legal (empresa_id, norma, articulo, requisito, cumple, responsable) VALUES (1,?,?,?,?,?)", 
+                          (l[0], l[1], l[2], l[3], l[4]))
+        
+        conn.commit()
+        st.success("✅ DATOS DE PRUEBA CARGADOS EXITOSAMENTE")
+        st.balloons()
+        
+        # Mostrar resumen
+        st.info(f"""
+        **Resumen de datos cargados:**
+        - ⚠️ Peligros: {len(peligros_data)}
+        - ✅ Acciones: {len(acciones_data)}
+        - 👥 Trabajadores: {len(trabajadores_data)}
+        - 📝 Incidentes: {len(incidentes_data)}
+        - 📋 Matriz Legal: {len(legal_data)}
+        """)
+
+# ========== MODULO GENERICO CON IMPORTAR/EXPORTAR ==========
+def modulo_completo(titulo, tabla, columnas_requeridas, df_func, template_data=None):
+    st.header(titulo)
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Lista", "📤 Exportar", "📥 Importar Excel", "🤖 IA Analizar"])
+    
+    with tab1:
+        df = df_func()
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+            st.caption(f"Total: {len(df)} registros")
+        else:
+            st.info("No hay datos. Usa 'Cargar Datos de Prueba' en Dashboard o importa desde Excel.")
+    
+    with tab2:
+        df = df_func()
+        if not df.empty:
+            excel_data = exportar_excel(df, tabla)
+            st.download_button("📊 Descargar Excel", data=excel_data, file_name=f"{tabla}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", use_container_width=True)
+            st.caption("Exporta todos los datos del módulo a Excel")
+        else:
+            st.info("No hay datos para exportar")
+    
+    with tab3:
+        uploaded = st.file_uploader(f"Selecciona archivo Excel para {titulo}", type=['xlsx', 'xls'], key=f"import_{tabla}")
+        if uploaded:
+            if st.button("📎 Importar datos", key=f"btn_import_{tabla}"):
+                success, msg, df_import = importar_excel(uploaded, tabla, columnas_requeridas)
+                if success:
+                    st.success(f"✅ {msg}")
+                    # Analizar con IA
+                    with st.spinner("🤖 IA analizando los datos importados..."):
+                        analisis = analizar_con_ia(df_import.head(10).to_string(), titulo)
+                        if analisis:
+                            st.info(f"🤖 **Análisis IA:** {analisis[:500]}")
+                    st.rerun()
+                else:
+                    st.error(msg)
+        
+        if template_data:
+            with st.expander("📄 Ver formato requerido"):
+                st.dataframe(pd.DataFrame(template_data), use_container_width=True)
+                st.caption(f"Columnas requeridas: {', '.join(columnas_requeridas)}")
+    
+    with tab4:
+        df = df_func()
+        if not df.empty:
+            with st.spinner("🤖 IA analizando los datos..."):
+                analisis = analizar_con_ia(df.to_string(), titulo)
+                if analisis:
+                    st.markdown("### 🤖 Análisis de IA")
+                    st.markdown(analisis)
+                else:
+                    st.warning("No se pudo obtener análisis de IA")
+        else:
+            st.info("No hay datos para analizar")
+
+# ========== FUNCIONES PARA OBTENER DATAFRAMES ==========
+def get_peligros():
+    return pd.read_sql_query("SELECT id, tipo, descripcion, probabilidad, severidad, nivel, fecha_registro FROM peligros", conn)
+
+def get_acciones():
+    return pd.read_sql_query("SELECT id, descripcion, responsable, fecha_limite, estado, fecha_registro FROM acciones", conn)
+
+def get_trabajadores():
+    return pd.read_sql_query("SELECT id, nombre, cedula, cargo, area, fecha_registro FROM trabajadores", conn)
+
+def get_incidentes():
+    return pd.read_sql_query("SELECT id, descripcion, fecha, gravedad, causa, fecha_registro FROM incidentes ORDER BY fecha DESC", conn)
+
+def get_matriz_legal():
+    return pd.read_sql_query("SELECT id, norma, articulo, requisito, cumple, responsable FROM matriz_legal", conn)
 
 # ========== SESION ==========
 if "auth" not in st.session_state:
@@ -174,9 +378,17 @@ if "user" not in st.session_state:
 
 # ========== LOGIN ==========
 if not st.session_state.auth:
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 1.3, 1])
     with col2:
-        st.markdown('<div style="background: rgba(20,20,40,0.75); backdrop-filter: blur(14px); border-radius: 28px; padding: 35px; text-align:center"><img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="65"><h1 style="color:white; font-size:24px">SG-SST PHVA</h1><p style="color:rgba(255,255,255,0.6)">Seguridad y Salud, compromiso de todos</p></div>', unsafe_allow_html=True)
+        st.markdown('''
+        <div style="background: rgba(20,20,40,0.75); backdrop-filter: blur(14px); border-radius: 28px; padding: 40px; text-align:center">
+            <img src="https://cdn-icons-png.flaticon.com/512/2917/2917995.png" width="70">
+            <h1 style="color:white; font-size:28px; margin:10px 0">SG-SST PHVA</h1>
+            <p style="color:rgba(255,255,255,0.6)">Seguridad y Salud, compromiso de todos</p>
+            <p style="color:rgba(255,255,255,0.4); font-size:12px">Sistema de Gestión PHVA con IA</p>
+        </div>
+        ''', unsafe_allow_html=True)
+        
         with st.form("login_form"):
             username = st.text_input("Usuario", placeholder="usuario")
             password = st.text_input("Contraseña", type="password", placeholder="contraseña")
@@ -187,100 +399,144 @@ if not st.session_state.auth:
                     st.session_state.user = user
                     st.rerun()
                 else:
-                    st.error("Usuario o contraseña incorrectos. Use admin/admin123")
-        st.markdown('<div style="text-align:center; font-size:10px; color:gray">SG-SST PHVA | JAN BENITEZ</div>', unsafe_allow_html=True)
+                    st.error("Usuario o contraseña incorrectos. Use: admin / admin123")
+        
+        st.markdown('<p style="text-align:center; font-size:11px; color:rgba(255,255,255,0.3); margin-top:20px">SG-SST PHVA | Desarrollado por JAN BENITEZ</p>', unsafe_allow_html=True)
     st.stop()
 
 # ========== SIDEBAR ==========
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=45)
-    st.markdown(f"**{st.session_state.user['nombre']}**")
+    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=50)
+    st.markdown(f"### {st.session_state.user['nombre']}")
+    st.caption(f"Rol: {st.session_state.user['rol'].upper()}")
     st.markdown("---")
-    menu = st.radio("MODULOS", ["Dashboard", "Peligros", "Plan de Accion", "Trabajadores", "Incidentes", "Matriz Legal", "Auditorias", "Plan Anual", "Chat IA"])
-    if st.button("Cerrar Sesion", use_container_width=True):
+    
+    menu = st.radio("MENU PRINCIPAL", [
+        "🏠 Dashboard",
+        "⚠️ Peligros",
+        "✅ Plan de Accion",
+        "👥 Trabajadores", 
+        "📝 Incidentes",
+        "📋 Matriz Legal",
+        "🔍 Auditorias",
+        "📅 Plan Anual",
+        "💬 Chat IA"
+    ])
+    
+    st.markdown("---")
+    if st.button("🚪 Cerrar Sesion", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
 # ========== DASHBOARD ==========
-if menu == "Dashboard":
-    st.title("Dashboard")
+if menu == "🏠 Dashboard":
+    st.title("🏠 Dashboard SST")
+    
+    empresa = get_empresa()
+    st.info(f"🏢 **{empresa.get('nombre', 'No registrada')}** | NIT: {empresa.get('nit', 'N/A')} | {empresa.get('ciudad', 'N/A')}")
+    
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("Peligros", pd.read_sql_query("SELECT COUNT(*) FROM peligros", conn).iloc[0,0])
-    with col2: st.metric("Acciones", pd.read_sql_query("SELECT COUNT(*) FROM acciones", conn).iloc[0,0])
-    with col3: st.metric("Trabajadores", pd.read_sql_query("SELECT COUNT(*) FROM trabajadores", conn).iloc[0,0])
-    with col4: st.metric("Incidentes", pd.read_sql_query("SELECT COUNT(*) FROM incidentes", conn).iloc[0,0])
+    with col1: st.metric("⚠️ Peligros", len(get_peligros()), delta="+5")
+    with col2: st.metric("✅ Acciones", len(get_acciones()), delta="+3")
+    with col3: st.metric("👥 Trabajadores", len(get_trabajadores()), delta="+10")
+    with col4: st.metric("📝 Incidentes", len(get_incidentes()), delta="-2")
+    
     st.markdown("---")
-    if st.button("Cargar Datos de Prueba", use_container_width=True):
-        cargar_datos_prueba()
-        st.rerun()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🚀 CARGAR DATOS DE PRUEBA COMPLETOS", use_container_width=True, type="primary"):
+            cargar_datos_prueba()
+            st.rerun()
+    with col2:
+        st.caption("✅ Simula 50+ registros: Peligros, Acciones, Trabajadores, Incidentes y Matriz Legal")
+    
+    st.markdown("---")
+    st.subheader("📊 Estadisticas rapidas")
+    
+    col1, col2, col3 = st.columns(3)
+    peligros_df = get_peligros()
+    if not peligros_df.empty:
+        with col1:
+            niveles = peligros_df['nivel'].value_counts()
+            st.bar_chart(niveles)
+            st.caption("Distribucion por nivel de riesgo")
+    
+    acciones_df = get_acciones()
+    if not acciones_df.empty:
+        with col2:
+            estados = acciones_df['estado'].value_counts()
+            st.bar_chart(estados)
+            st.caption("Estado de acciones")
+    
+    incidentes_df = get_incidentes()
+    if not incidentes_df.empty:
+        with col3:
+            gravedades = incidentes_df['gravedad'].value_counts()
+            st.bar_chart(gravedades)
+            st.caption("Gravedad de incidentes")
 
-# ========== PELIGROS ==========
-elif menu == "Peligros":
-    st.header("Peligros")
-    df = pd.read_sql_query("SELECT * FROM peligros", conn)
+# ========== MODULOS ==========
+elif menu == "⚠️ Peligros":
+    template = [{"tipo": "Fisico", "descripcion": "Ejemplo de peligro", "probabilidad": 3, "severidad": 2}]
+    modulo_completo("⚠️ GESTION DE PELIGROS", "peligros", ['tipo', 'descripcion', 'probabilidad', 'severidad'], get_peligros, template)
+
+elif menu == "✅ Plan de Accion":
+    template = [{"descripcion": "Ejemplo de accion", "responsable": "SST", "fecha_limite": "2024-12-31", "estado": "Pendiente"}]
+    modulo_completo("✅ PLAN DE ACCION", "acciones", ['descripcion', 'responsable', 'fecha_limite', 'estado'], get_acciones, template)
+
+elif menu == "👥 Trabajadores":
+    template = [{"nombre": "Ejemplo", "cedula": "12345678", "cargo": "Operario", "area": "Produccion"}]
+    modulo_completo("👥 TRABAJADORES", "trabajadores", ['nombre', 'cedula', 'cargo', 'area'], get_trabajadores, template)
+
+elif menu == "📝 Incidentes":
+    template = [{"descripcion": "Ejemplo incidente", "fecha": "2024-12-01", "gravedad": "Leve", "causa": "Ejemplo"}]
+    modulo_completo("📝 INCIDENTES", "incidentes", ['descripcion', 'fecha', 'gravedad', 'causa'], get_incidentes, template)
+
+elif menu == "📋 Matriz Legal":
+    df = get_matriz_legal()
+    st.header("📋 MATRIZ LEGAL")
     st.dataframe(df, use_container_width=True)
-    excel_data = exportar_excel(df, "peligros")
-    st.download_button("Exportar a Excel", data=excel_data, file_name=f"peligros_{datetime.now().strftime('%Y%m%d')}.xlsx")
+    if st.button("Exportar Matriz Legal"):
+        excel_data = exportar_excel(df, "matriz_legal")
+        st.download_button("Descargar Excel", data=excel_data, file_name=f"matriz_legal_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
-# ========== PLAN DE ACCION ==========
-elif menu == "Plan de Accion":
-    st.header("Plan de Accion")
-    df = pd.read_sql_query("SELECT * FROM acciones", conn)
-    st.dataframe(df, use_container_width=True)
-    excel_data = exportar_excel(df, "acciones")
-    st.download_button("Exportar a Excel", data=excel_data, file_name=f"acciones_{datetime.now().strftime('%Y%m%d')}.xlsx")
-
-# ========== TRABAJADORES ==========
-elif menu == "Trabajadores":
-    st.header("Trabajadores")
-    df = pd.read_sql_query("SELECT * FROM trabajadores", conn)
-    st.dataframe(df, use_container_width=True)
-    excel_data = exportar_excel(df, "trabajadores")
-    st.download_button("Exportar a Excel", data=excel_data, file_name=f"trabajadores_{datetime.now().strftime('%Y%m%d')}.xlsx")
-
-# ========== INCIDENTES ==========
-elif menu == "Incidentes":
-    st.header("Incidentes")
-    df = pd.read_sql_query("SELECT * FROM incidentes ORDER BY fecha DESC", conn)
-    st.dataframe(df, use_container_width=True)
-    excel_data = exportar_excel(df, "incidentes")
-    st.download_button("Exportar a Excel", data=excel_data, file_name=f"incidentes_{datetime.now().strftime('%Y%m%d')}.xlsx")
-
-# ========== MATRIZ LEGAL ==========
-elif menu == "Matriz Legal":
-    st.header("Matriz Legal")
-    df = pd.read_sql_query("SELECT * FROM matriz_legal", conn)
-    st.dataframe(df, use_container_width=True)
-
-# ========== AUDITORIAS ==========
-elif menu == "Auditorias":
-    st.header("Auditorias")
+elif menu == "🔍 Auditorias":
+    st.header("🔍 AUDITORIAS")
     df = pd.read_sql_query("SELECT * FROM auditorias", conn)
     st.dataframe(df, use_container_width=True)
+    st.info("Funcionalidad en desarrollo - Proximamente podras crear auditorias completas")
 
-# ========== PLAN ANUAL ==========
-elif menu == "Plan Anual":
-    st.header("Plan Anual")
+elif menu == "📅 Plan Anual":
+    st.header("📅 PLAN ANUAL")
     df = pd.read_sql_query("SELECT * FROM plan_anual", conn)
     st.dataframe(df, use_container_width=True)
+    st.info("Funcionalidad en desarrollo - Proximamente generacion con IA")
 
-# ========== CHAT IA ==========
-elif menu == "Chat IA":
-    st.title("Chat IA")
+elif menu == "💬 Chat IA":
+    st.title("💬 CHAT IA - Consultor SST")
+    
+    empresa = get_empresa()
+    st.caption(f"Consultando sobre: {empresa.get('nombre', 'Empresa')}")
+    
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
-    if prompt := st.chat_input("Pregunta sobre SST..."):
+    
+    if prompt := st.chat_input("Pregunta sobre SST, peligros, incidentes o normativa..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
         with st.chat_message("assistant"):
-            with st.spinner("Pensando..."):
-                respuesta = call_best_ia(prompt)
+            with st.spinner("🤖 IA consultando..."):
+                # Contexto de la empresa
+                contexto = f"Empresa: {empresa.get('nombre', 'N/A')}, Sector: {empresa.get('sector', 'N/A')}"
+                respuesta = call_best_ia(f"{contexto}\n\nPregunta: {prompt}")
                 st.write(respuesta)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta})
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; font-size:12px; color:rgba(255,255,255,0.4)'>🔄 SG-SST PHVA | Sistema de Gestión PHVA con IA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
