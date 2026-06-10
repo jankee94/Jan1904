@@ -267,3 +267,4 @@ else:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | Sistema Multiempresa | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+
