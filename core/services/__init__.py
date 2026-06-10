@@ -3,3 +3,4 @@ from core.services.inspeccion_service import inspeccion_service
 from core.services.emergencia_service import emergencia_service
 from core.services.emergencia_service import emergencia_service
 from core.services.documento_service import documento_service
+from core.services.indicador_service import indicador_service
