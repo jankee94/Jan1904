@@ -1,1 +1,2 @@
 from core.services.capacitacion_service import capacitacion_service
+from core.services.inspeccion_service import inspeccion_service

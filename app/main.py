@@ -12,6 +12,7 @@ from firebase.firestore.client import firestore_client
 
 # Importar módulos
 from modules.capacitaciones.ui import render_capacitaciones
+from modules.inspecciones.ui import render_inspecciones
 
 st.set_page_config(
     page_title=settings.APP_NAME,
@@ -241,3 +242,4 @@ pages.get(selected_module, show_dashboard)()
 # Footer
 st.markdown("---")
 st.markdown(f"<p style='text-align: center; color: rgba(255,255,255,0.4); font-size: 12px;'>🔄 {settings.APP_NAME} v{settings.APP_VERSION} | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
+
