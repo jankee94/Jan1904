@@ -10,28 +10,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== IA CORREGIDA ==========
+# ========== IA CORRECTA ==========
 def call_gemini():
     try:
         key = st.secrets.get("GEMINI_API_KEY_1")
         if not key:
             key = st.secrets.get("GEMINI_API_KEY")
         if not key:
-            return "No hay Gemini key configurada"
+            return "No hay Gemini key"
         
-        # IMPORTANTE: Usar el modelo correcto gemini-1.5-flash
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        # Modelo correcto: gemini-1.5-pro
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
         headers = {"Content-Type": "application/json", "x-goog-api-key": key}
         data = {"contents": [{"parts": [{"text": "Responde solo: OK"}]}]}
         
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        r = requests.post(url, json=data, headers=headers, timeout=30)
         
-        if response.status_code == 200:
-            result = response.json()
-            texto = result["candidates"][0]["content"]["parts"][0]["text"]
-            return f"✅ Gemini responde: {texto}"
+        if r.status_code == 200:
+            texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return f"✅ Gemini: {texto}"
         else:
-            return f"❌ Error {response.status_code}: {response.text[:200]}"
+            return f"❌ Error {r.status_code}: {r.text[:100]}"
     except Exception as e:
         return f"❌ Error: {e}"
 
@@ -39,19 +38,19 @@ def call_groq():
     try:
         key = st.secrets.get("GROQ_API_KEY")
         if not key:
-            return "No hay Groq key configurada"
+            return "No hay Groq key"
         
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        data = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
+        data = {"model": "llama3-70b-8192", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
         
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        r = requests.post(url, json=data, headers=headers, timeout=30)
         
-        if response.status_code == 200:
-            texto = response.json()["choices"][0]["message"]["content"]
-            return f"✅ Groq responde: {texto}"
+        if r.status_code == 200:
+            texto = r.json()["choices"][0]["message"]["content"]
+            return f"✅ Groq: {texto}"
         else:
-            return f"❌ Error {response.status_code}: {response.text[:200]}"
+            return f"❌ Error {r.status_code}: {r.text[:100]}"
     except Exception as e:
         return f"❌ Error: {e}"
 
@@ -61,16 +60,16 @@ def chat_ia(pregunta):
         if not key:
             key = st.secrets.get("GEMINI_API_KEY")
         
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
         headers = {"Content-Type": "application/json", "x-goog-api-key": key}
-        data = {"contents": [{"parts": [{"text": f"Eres un experto en SST. Responde: {pregunta}"}]}]}
+        data = {"contents": [{"parts": [{"text": f"Eres experto en SST. Responde: {pregunta}"}]}]}
         
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        r = requests.post(url, json=data, headers=headers, timeout=30)
         
-        if response.status_code == 200:
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        if r.status_code == 200:
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            return f"Error: {response.status_code}"
+            return f"Error: {r.status_code}"
     except Exception as e:
         return f"Error: {e}"
 
@@ -90,65 +89,56 @@ if not st.session_state.auth:
                     st.session_state.auth = True
                     st.rerun()
                 else:
-                    st.error("Use admin / admin123")
+                    st.error("admin / admin123")
     st.stop()
 
-# ========== SIDEBAR ==========
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=50)
-    menu = st.radio("Menú", ["Dashboard", "Chat IA"])
+    menu = st.radio("Menu", ["Dashboard", "Chat IA"])
     if st.button("Salir"):
         st.session_state.auth = False
         st.rerun()
 
-# ========== DASHBOARD ==========
 if menu == "Dashboard":
-    st.markdown('<div class="main-header"><h1>📊 Dashboard</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>Dashboard</h1></div>', unsafe_allow_html=True)
     
     st.subheader("🤖 Prueba de API Keys")
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔌 Probar Gemini", use_container_width=True):
-            with st.spinner("Conectando con Gemini..."):
-                resultado = call_gemini()
-                if "✅" in resultado:
-                    st.success(resultado)
-                    st.balloons()
+        if st.button("Probar Gemini"):
+            with st.spinner("Probando..."):
+                r = call_gemini()
+                if "✅" in r:
+                    st.success(r)
                 else:
-                    st.error(resultado)
-    
+                    st.error(r)
     with col2:
-        if st.button("🔌 Probar Groq", use_container_width=True):
-            with st.spinner("Conectando con Groq..."):
-                resultado = call_groq()
-                if "✅" in resultado:
-                    st.success(resultado)
-                    st.balloons()
+        if st.button("Probar Groq"):
+            with st.spinner("Probando..."):
+                r = call_groq()
+                if "✅" in r:
+                    st.success(r)
                 else:
-                    st.error(resultado)
-    
-    st.markdown("---")
-    st.info("Gemini: modelo gemini-1.5-flash | Groq: modelo llama-3.3-70b-versatile")
+                    st.error(r)
 
-# ========== CHAT IA ==========
 elif menu == "Chat IA":
-    st.markdown('<div class="main-header"><h1>💬 Chat IA</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>Chat IA</h1></div>', unsafe_allow_html=True)
     
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    if "msgs" not in st.session_state:
+        st.session_state.msgs = []
     
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
+    for m in st.session_state.msgs:
+        with st.chat_message(m["role"]):
+            st.write(m["content"])
     
-    if prompt := st.chat_input("Pregunta sobre SST..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if p := st.chat_input("Pregunta sobre SST..."):
+        st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("assistant"):
             with st.spinner("Pensando..."):
-                respuesta = chat_ia(prompt)
-                st.write(respuesta)
-                st.session_state.messages.append({"role": "assistant", "content": respuesta})
+                r = chat_ia(p)
+                st.write(r)
+                st.session_state.msgs.append({"role": "assistant", "content": r})
 
 st.markdown("---")
 st.markdown("<p style='text-align:center'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
