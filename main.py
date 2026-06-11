@@ -342,3 +342,6 @@ st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
 
 # ERROR_LOG - 06/11/2026 09:47:15
+
+
+# FIX_EMPRESA - 06/11/2026 09:48:40
