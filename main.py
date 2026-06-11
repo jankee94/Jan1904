@@ -215,3 +215,5 @@ elif menu == "Chat IA":
 
 st.markdown("---")
 st.markdown("<p style='text-align:center'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
+
+# Force update - 06/11/2026 08:28:14
