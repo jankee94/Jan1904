@@ -3,14 +3,11 @@ import pandas as pd
 from datetime import datetime
 import io
 import requests
-import itertools
 import json
-import sys
-import traceback
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
-# ========== CSS PARA ERRORES VISIBLES ==========
+# ========== CSS ==========
 st.markdown('''
 <style>
     .stApp { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); }
@@ -23,105 +20,8 @@ st.markdown('''
         margin-bottom: 20px;
     }
     .main-header h1 { color: white; margin: 0; font-size: 1.8rem; }
-    .error-global {
-        background: rgba(231, 76, 60, 0.4);
-        border: 2px solid #e74c3c;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        font-family: monospace;
-        font-size: 13px;
-        white-space: pre-wrap;
-        color: white;
-    }
-    .error-global summary {
-        cursor: pointer;
-        color: #ff6b6b;
-        font-weight: bold;
-    }
 </style>
 ''', unsafe_allow_html=True)
-
-# ========== CAPTURA GLOBAL DE ERRORES ==========
-error_global_log = []
-
-def log_error(error_msg, error_detail=""):
-    """Registrar error global"""
-    error_entry = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-        "message": str(error_msg),
-        "detail": str(error_detail),
-        "traceback": traceback.format_exc()
-    }
-    error_global_log.append(error_entry)
-    
-    # Mostrar error visiblemente
-    st.markdown(f'''
-    <div class="error-global">
-        <details open>
-            <summary>🔴 ERROR DETECTADO</summary>
-            <b>Hora:</b> {error_entry['timestamp']}<br>
-            <b>Mensaje:</b> {error_msg}<br>
-            <b>Detalle:</b><br><code>{error_detail[:500] if error_detail else 'Sin detalle'}</code><br>
-            <b>Traceback:</b><br><code>{traceback.format_exc()[:1000]}</code>
-        </details>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    return error_entry
-
-# ========== CONFIGURACIÓN DE IA ==========
-def get_all_gemini_keys():
-    keys = []
-    try:
-        for i in range(1, 10):
-            key = st.secrets.get(f"GEMINI_API_KEY_{i}")
-            if key and key != "":
-                keys.append(key)
-        if not keys:
-            key = st.secrets.get("GEMINI_API_KEY")
-            if key and key != "":
-                keys.append(key)
-    except Exception as e:
-        log_error("Error leyendo Gemini keys", str(e))
-    return keys
-
-def get_groq_key():
-    try:
-        return st.secrets.get("GROQ_API_KEY")
-    except Exception as e:
-        log_error("Error leyendo Groq key", str(e))
-        return None
-
-GEMINI_KEYS = get_all_gemini_keys()
-GROQ_KEY = get_groq_key()
-gemini_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
-
-def call_gemini(prompt):
-    if not GEMINI_KEYS:
-        return None
-    for _ in range(len(GEMINI_KEYS) * 2):
-        try:
-            key = next(gemini_cycle)
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-            headers = {"Content-Type": "application/json", "X-goog-api-key": key}
-            data = {"contents": [{"parts": [{"text": prompt}]}]}
-            r = requests.post(url, json=data, headers=headers, timeout=30)
-            if r.status_code == 200:
-                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            elif r.status_code == 429:
-                log_error(f"Rate limit en Gemini (429)", f"Key: {key[:20]}...")
-                continue
-        except Exception as e:
-            log_error("Error en llamada Gemini", str(e))
-            continue
-    return None
-
-def call_best_ia(prompt):
-    respuesta = call_gemini(prompt)
-    if respuesta:
-        return respuesta
-    return "⚠️ IA no disponible. Las keys de Gemini están en rate limit. Intenta de nuevo en unos segundos."
 
 # ========== FUNCIONES ==========
 def exportar_excel(data, nombre):
@@ -139,10 +39,6 @@ def init_session():
         st.session_state.username = None
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
-    if "current_menu" not in st.session_state:
-        st.session_state.current_menu = "Dashboard"
-    if "error_log" not in st.session_state:
-        st.session_state.error_log = []
     
     if "empresa" not in st.session_state:
         st.session_state.empresa = {"nombre": "Constructora Segura SAS", "nit": "901.234.567-8"}
@@ -214,39 +110,19 @@ with st.sidebar:
     st.markdown(f"### {st.session_state.username}")
     st.markdown("---")
     
-    nuevo_menu = st.radio("📋 MÓDULOS", [
+    menu = st.radio("📋 MÓDULOS", [
         "Dashboard", "Empresa", "Peligros", "Plan de Acción",
         "Trabajadores", "Incidentes", "Matriz Legal", "Auditorías",
         "Capacitaciones", "Inspecciones", "Emergencias", "Documentos",
         "Indicadores", "Chat IA"
     ])
     
-    # Detectar cambio de módulo
-    if nuevo_menu != st.session_state.get("current_menu", ""):
-        st.session_state.current_menu = nuevo_menu
-        # Limpiar errores anteriores al cambiar
-        st.session_state.error_log = []
-    
     st.markdown("---")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.auth = False
         st.rerun()
 
-menu = st.session_state.current_menu
-
-# ========== WRAPPER PARA CAPTURAR ERRORES EN CADA MÓDULO ==========
-def run_module_safe(module_func, module_name):
-    """Ejecutar módulo capturando cualquier error"""
-    try:
-        module_func()
-    except Exception as e:
-        error_msg = f"Error en módulo {module_name}: {str(e)}"
-        error_detail = traceback.format_exc()
-        log_error(error_msg, error_detail)
-        st.error(f"❌ {error_msg}")
-        st.code(error_detail)
-
-# ========== DEFINICIÓN DE MÓDULOS ==========
+# ========== FUNCIONES DE RENDER ==========
 def render_dashboard():
     st.markdown(f'<div class="main-header"><h1>📊 Dashboard SST</h1><p>{st.session_state.empresa["nombre"]}</p></div>', unsafe_allow_html=True)
     
@@ -259,60 +135,63 @@ def render_dashboard():
         st.metric("👥 Trabajadores", len(st.session_state.trabajadores))
     with col4:
         st.metric("📝 Incidentes", len(st.session_state.incidentes))
-    
-    # Mostrar errores capturados
-    if error_global_log:
-        with st.expander(f"⚠️ Ver {len(error_global_log)} errores capturados", expanded=True):
-            for err in error_global_log[-5:]:
-                st.code(f"[{err['timestamp']}] {err['message']}\n{err['detail'][:300]}")
-    
-    with st.expander("🤖 Estado IA"):
-        st.write(f"Gemini Keys: {len(GEMINI_KEYS)}")
-        if st.button("Probar IA"):
-            with st.spinner("Probando..."):
-                test = call_best_ia("Responde solo: OK")
-                if test and "⚠️" not in test:
-                    st.success(f"✅ {test}")
-                else:
-                    st.error(f"❌ {test}")
-
-def render_empresa():
-    st.markdown('<div class="main-header"><h1>🏢 Configuración</h1></div>', unsafe_allow_html=True)
-    with st.form("empresa_form"):
-        nombre = st.text_input("Nombre", value=st.session_state.empresa["nombre"])
-        nit = st.text_input("NIT", value=st.session_state.empresa["nit"])
-        if st.form_submit_button("Guardar"):
-            st.session_state.empresa["nombre"] = nombre
-            st.session_state.empresa["nit"] = nit
-            st.success("✅ Guardado")
 
 def render_modulo(titulo, datos, session_key):
     st.markdown(f'<div class="main-header"><h1>{titulo}</h1></div>', unsafe_allow_html=True)
-    if datos and len(datos) > 0:
-        df = pd.DataFrame(datos)
-        st.dataframe(df, use_container_width=True)
-        excel_data = exportar_excel(datos, session_key)
-        st.download_button("📥 Exportar Excel", data=excel_data, file_name=f"{session_key}_{datetime.now().strftime('%Y%m%d')}.xlsx")
-    else:
-        st.info("No hay datos registrados")
+    
+    tab1, tab2 = st.tabs(["📋 Lista", "📥 Exportar"])
+    
+    with tab1:
+        if datos and len(datos) > 0:
+            st.dataframe(pd.DataFrame(datos), use_container_width=True)
+        else:
+            st.info("No hay datos registrados")
+    
+    with tab2:
+        if datos and len(datos) > 0:
+            excel_data = exportar_excel(datos, session_key)
+            st.download_button("📥 Descargar Excel", data=excel_data, file_name=f"{session_key}_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
 def render_chat_ia():
-    st.markdown('<div class="main-header"><h1>💬 Chat IA</h1><p>Pregunta sobre SST o sobre errores de la app</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>💬 Chat IA</h1><p>Asistente virtual - Escribe tu pregunta</p></div>', unsafe_allow_html=True)
+    
+    # Función local para IA solo en el chat
+    def call_groq_only(prompt):
+        try:
+            key = st.secrets.get("GROQ_API_KEY")
+            if not key:
+                return "⚠️ No hay API key de Groq configurada"
+            
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            data = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7
+            }
+            r = requests.post(url, json=data, headers=headers, timeout=30)
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"]
+            else:
+                return f"Error {r.status_code}: {r.text[:100]}"
+        except Exception as e:
+            return f"Error: {str(e)}"
     
     if not st.session_state.chat_messages:
-        st.session_state.chat_messages = [{"role": "assistant", "content": f"Hola, uso {len(GEMINI_KEYS)} keys de Gemini. ¿En qué puedo ayudarte?"}]
+        st.session_state.chat_messages = [{"role": "assistant", "content": "Hola, soy tu asistente SST. Uso Groq para responder. ¿En qué puedo ayudarte?"}]
     
     for msg in st.session_state.chat_messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if prompt := st.chat_input("Escribe tu pregunta..."):
+    if prompt := st.chat_input("Pregunta sobre SST..."):
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
+        
         with st.chat_message("assistant"):
-            with st.spinner("Pensando..."):
-                # Incluir errores en el contexto
-                error_context = f"\n\nERRORES CAPTURADOS:\n{json.dumps(error_global_log[-5:], indent=2)}" if error_global_log else ""
-                respuesta = call_best_ia(prompt + error_context)
+            with st.spinner("Consultando IA..."):
+                respuesta = call_groq_only(prompt)
                 st.write(respuesta)
                 st.session_state.chat_messages.append({"role": "assistant", "content": respuesta})
 
@@ -339,11 +218,18 @@ def render_indicadores():
     with col2:
         st.metric("Trabajadores", total)
 
-# ========== RUTEO CON CAPTURA DE ERRORES ==========
+# ========== RUTEO ==========
 if menu == "Dashboard":
     render_dashboard()
 elif menu == "Empresa":
-    render_empresa()
+    st.markdown('<div class="main-header"><h1>🏢 Configuración</h1></div>', unsafe_allow_html=True)
+    with st.form("empresa_form"):
+        nombre = st.text_input("Nombre", value=st.session_state.empresa["nombre"])
+        nit = st.text_input("NIT", value=st.session_state.empresa["nit"])
+        if st.form_submit_button("Guardar"):
+            st.session_state.empresa["nombre"] = nombre
+            st.session_state.empresa["nit"] = nit
+            st.success("✅ Guardado")
 elif menu == "Peligros":
     render_modulo("⚠️ Peligros", st.session_state.peligros, "peligros")
 elif menu == "Plan de Acción":
@@ -372,5 +258,4 @@ elif menu == "Chat IA":
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
 
-# GLOBAL_ERROR - 06/11/2026 09:30:36
-
+# NO_AUTO_IA - 06/11/2026 09:44:00
