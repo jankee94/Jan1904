@@ -640,3 +640,6 @@ st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:rgba(255,255,255,0.4)'>🔄 SG-SST PHVA | Sistema de Gestión PHVA con IA | Desarrollado por JAN BENITEZ</p>", unsafe_allow_html=True)
 
 # FINAL - 06/11/2026 08:38:39
+
+
+# FIX - 06/11/2026 08:39:12
