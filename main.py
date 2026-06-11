@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time
+import itertools
 
 st.set_page_config(page_title="SG-SST PHVA", layout="wide")
 
@@ -11,21 +12,43 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== IA CON REINTENTOS ==========
+# ========== CONFIGURACIÓN DE MÚLTIPLES KEYS ==========
+
+def get_all_gemini_keys():
+    """Obtener todas las keys de Gemini desde secrets"""
+    keys = []
+    # Intentar obtener múltiples keys
+    for i in range(1, 10):
+        key = st.secrets.get(f"GEMINI_API_KEY_{i}")
+        if key and key != "":
+            keys.append(key)
+    # Si no hay keys con sufijo, intentar con la key simple
+    if not keys:
+        key = st.secrets.get("GEMINI_API_KEY")
+        if key and key != "":
+            keys.append(key)
+    return keys
+
+def get_groq_key():
+    return st.secrets.get("GROQ_API_KEY")
+
+# Obtener todas las keys
+GEMINI_KEYS = get_all_gemini_keys()
+GROQ_KEY = get_groq_key()
+
+# Crear ciclo rotador para Gemini
+gemini_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
+
+# Estado de las keys
+st.session_state.gemini_keys_count = len(GEMINI_KEYS)
+st.session_state.current_key_index = 0
 
 def call_gemini_with_retry(prompt, max_retries=3):
-    """Llamar a Gemini con reintentos automáticos"""
-    key = st.secrets.get("GEMINI_API_KEY_1")
-    if not key:
-        key = st.secrets.get("GEMINI_API_KEY")
-    if not key:
-        return None, "No hay Gemini key"
+    """Llamar a Gemini con rotación de keys y reintentos"""
+    if not GEMINI_KEYS:
+        return None, "No hay Gemini keys configuradas"
     
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-    headers = {
-        "Content-Type": "application/json",
-        "X-goog-api-key": key
-    }
     data = {
         "contents": [
             {
@@ -38,29 +61,37 @@ def call_gemini_with_retry(prompt, max_retries=3):
         ]
     }
     
-    for intento in range(max_retries):
+    # Probar cada key varias veces
+    for intento in range(max_retries * len(GEMINI_KEYS)):
+        key = next(gemini_cycle)
+        
         try:
+            headers = {
+                "Content-Type": "application/json",
+                "X-goog-api-key": key
+            }
             r = requests.post(url, json=data, headers=headers, timeout=30)
             
             if r.status_code == 200:
                 texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                 return texto, None
             elif r.status_code == 503:
-                # Servicio ocupado, esperar y reintentar
-                wait_time = (intento + 1) * 2
-                time.sleep(wait_time)
+                # Servicio ocupado, probar siguiente key
+                time.sleep(1)
+                continue
+            elif r.status_code == 429:
+                # Rate limit, probar siguiente key
+                time.sleep(1)
                 continue
             else:
-                return None, f"Error {r.status_code}: {r.text[:100]}"
+                continue
         except Exception as e:
-            if intento == max_retries - 1:
-                return None, f"Error: {e}"
-            time.sleep(2)
+            continue
     
-    return None, "Servicio temporalmente no disponible. Intenta de nuevo en unos momentos."
+    return None, "Todas las keys de Gemini están ocupadas o no disponibles. Intenta de nuevo en unos momentos."
 
-def call_gemini():
-    """Función simple para pruebas"""
+def call_gemini_test():
+    """Función para pruebas en Dashboard"""
     resultado, error = call_gemini_with_retry("Responde solo: OK", max_retries=2)
     if resultado:
         return f"✅ Gemini: {resultado}"
@@ -69,12 +100,11 @@ def call_gemini():
 
 def call_groq():
     try:
-        key = st.secrets.get("GROQ_API_KEY")
-        if not key:
-            return "No hay Groq key"
+        if not GROQ_KEY:
+            return "No hay Groq key configurada"
         
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
         data = {"model": "llama3-70b-8192", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
         
         r = requests.post(url, json=data, headers=headers, timeout=30)
@@ -83,12 +113,12 @@ def call_groq():
             texto = r.json()["choices"][0]["message"]["content"]
             return f"✅ Groq: {texto}"
         else:
-            return f"❌ Error {r.status_code}: {r.text[:100]}"
+            return f"❌ Error {r.status_code}"
     except Exception as e:
         return f"❌ Error: {e}"
 
 def chat_gemini(pregunta):
-    """Chat con reintentos y mensaje amigable"""
+    """Chat con rotación de keys"""
     resultado, error = call_gemini_with_retry(
         f"Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia. Responde de forma clara y profesional: {pregunta}",
         max_retries=3
@@ -96,7 +126,7 @@ def chat_gemini(pregunta):
     if resultado:
         return resultado
     else:
-        return f"⚠️ Gemini está con alta demanda en este momento. Por favor, intenta de nuevo en unos segundos.\n\nDetalle: {error}"
+        return f"⚠️ {error}"
 
 # ========== LOGIN ==========
 if "auth" not in st.session_state:
@@ -127,19 +157,33 @@ with st.sidebar:
 if menu == "Dashboard":
     st.markdown('<div class="main-header"><h1>Dashboard</h1></div>', unsafe_allow_html=True)
     
-    st.subheader("🤖 Prueba de API Keys")
+    # Mostrar estado de las keys
+    st.subheader("📊 Estado de API Keys")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Gemini Keys", len(GEMINI_KEYS))
+        for i, key in enumerate(GEMINI_KEYS):
+            st.caption(f"Key {i+1}: {key[:15]}...{key[-5:]}")
+    with col2:
+        st.metric("Groq Key", "✅ Configurada" if GROQ_KEY else "❌ No configurada")
+        if GROQ_KEY:
+            st.caption(f"Key: {GROQ_KEY[:15]}...{GROQ_KEY[-5:]}")
+    
+    st.markdown("---")
+    st.subheader("🤖 Prueba de Conexión")
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔌 Probar Gemini", use_container_width=True):
-            with st.spinner("Probando Gemini (con reintentos automáticos)..."):
-                r = call_gemini()
+        if st.button("🔌 Probar Gemini (con rotación)", use_container_width=True):
+            with st.spinner(f"Probando {len(GEMINI_KEYS)} keys de Gemini..."):
+                r = call_gemini_test()
                 if "✅" in r:
                     st.success(r)
                     st.balloons()
                 else:
                     st.error(r)
-                    st.info("Gemini está con alta demanda. El sistema reintentará automáticamente.")
+                    st.info("El sistema probará automáticamente las 3 keys")
+    
     with col2:
         if st.button("🔌 Probar Groq", use_container_width=True):
             with st.spinner("Probando Groq..."):
@@ -151,13 +195,13 @@ if menu == "Dashboard":
                     st.error(r)
     
     st.markdown("---")
-    st.info("Gemini: gemini-flash-latest (con reintentos automáticos) | Groq: llama3-70b-8192")
+    st.info(f"⚙️ Configuración actual: {len(GEMINI_KEYS)} keys de Gemini en rotación | Groq como respaldo")
 
 elif menu == "Chat IA":
     st.markdown('<div class="main-header"><h1>Chat IA</h1></div>', unsafe_allow_html=True)
     
     if "msgs" not in st.session_state:
-        st.session_state.msgs = [{"role": "assistant", "content": "Hola, soy tu asistente SST. ¿En qué puedo ayudarte?"}]
+        st.session_state.msgs = [{"role": "assistant", "content": f"Hola, soy tu asistente SST. Estoy usando {len(GEMINI_KEYS)} keys de Gemini en rotación. ¿En qué puedo ayudarte?"}]
     
     for m in st.session_state.msgs:
         with st.chat_message(m["role"]):
@@ -166,7 +210,7 @@ elif menu == "Chat IA":
     if p := st.chat_input("Pregunta sobre SST..."):
         st.session_state.msgs.append({"role": "user", "content": p})
         with st.chat_message("assistant"):
-            with st.spinner("Consultando Gemini (con reintentos automáticos)..."):
+            with st.spinner(f"Consultando {len(GEMINI_KEYS)} keys de Gemini..."):
                 r = chat_gemini(p)
                 st.write(r)
                 st.session_state.msgs.append({"role": "assistant", "content": r})
