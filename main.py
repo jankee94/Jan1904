@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import io
-import requests
 import json
+import os
+import traceback
 
 st.set_page_config(page_title="SG-SST PHVA", page_icon="🔄", layout="wide")
 
@@ -20,8 +21,88 @@ st.markdown('''
         margin-bottom: 20px;
     }
     .main-header h1 { color: white; margin: 0; font-size: 1.8rem; }
+    .error-log {
+        background: #1a1a2e;
+        border-left: 4px solid #e74c3c;
+        padding: 10px;
+        margin: 5px 0;
+        font-family: monospace;
+        font-size: 11px;
+        white-space: pre-wrap;
+        border-radius: 5px;
+    }
 </style>
 ''', unsafe_allow_html=True)
+
+# ========== REGISTRO DE ERRORES ==========
+ERROR_LOG_FILE = "errores_log.txt"
+
+def guardar_error(error_msg, error_detail=""):
+    """Guardar error en archivo"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    error_entry = f"""
+{'='*60}
+[{timestamp}] ERROR
+Mensaje: {error_msg}
+Detalle: {error_detail}
+Traceback: {traceback.format_exc()}
+{'='*60}
+"""
+    try:
+        with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(error_entry)
+    except:
+        pass
+    
+    # También guardar en session state
+    if "error_list" not in st.session_state:
+        st.session_state.error_list = []
+    st.session_state.error_list.append({
+        "timestamp": timestamp,
+        "message": str(error_msg),
+        "detail": str(error_detail)
+    })
+    
+    return error_entry
+
+def mostrar_errores():
+    """Mostrar errores guardados"""
+    if "error_list" in st.session_state and st.session_state.error_list:
+        st.warning(f"⚠️ {len(st.session_state.error_list)} errores registrados")
+        for err in st.session_state.error_list[-10:]:  # Últimos 10
+            st.markdown(f'<div class="error-log">[{err["timestamp"]}] {err["message"][:200]}</div>', unsafe_allow_html=True)
+        
+        # Botón para limpiar
+        if st.button("🗑️ Limpiar registro de errores"):
+            st.session_state.error_list = []
+            if os.path.exists(ERROR_LOG_FILE):
+                os.remove(ERROR_LOG_FILE)
+            st.rerun()
+    else:
+        st.success("✅ No hay errores registrados")
+
+# ========== CONFIGURACIÓN DE IA (solo Groq para evitar rate limit) ==========
+def call_groq(prompt):
+    try:
+        key = st.secrets.get("GROQ_API_KEY")
+        if not key:
+            return "⚠️ No hay API key de Groq configurada"
+        
+        import requests
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        data = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7
+        }
+        r = requests.post(url, json=data, headers=headers, timeout=30)
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"]
+        else:
+            return f"Error {r.status_code}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # ========== FUNCIONES ==========
 def exportar_excel(data, nombre):
@@ -39,6 +120,8 @@ def init_session():
         st.session_state.username = None
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
+    if "error_list" not in st.session_state:
+        st.session_state.error_list = []
     
     if "empresa" not in st.session_state:
         st.session_state.empresa = {"nombre": "Constructora Segura SAS", "nit": "901.234.567-8"}
@@ -122,7 +205,18 @@ with st.sidebar:
         st.session_state.auth = False
         st.rerun()
 
-# ========== FUNCIONES DE RENDER ==========
+# ========== FUNCIONES DE RENDER CON CAPTURA DE ERRORES ==========
+def safe_render(func, name):
+    """Renderizar función capturando errores"""
+    try:
+        func()
+    except Exception as e:
+        error_msg = f"Error en {name}: {str(e)}"
+        guardar_error(error_msg, traceback.format_exc())
+        st.error(f"❌ {error_msg}")
+        with st.expander("Ver detalles del error"):
+            st.code(traceback.format_exc())
+
 def render_dashboard():
     st.markdown(f'<div class="main-header"><h1>📊 Dashboard SST</h1><p>{st.session_state.empresa["nombre"]}</p></div>', unsafe_allow_html=True)
     
@@ -135,6 +229,11 @@ def render_dashboard():
         st.metric("👥 Trabajadores", len(st.session_state.trabajadores))
     with col4:
         st.metric("📝 Incidentes", len(st.session_state.incidentes))
+    
+    # Mostrar registro de errores
+    st.markdown("---")
+    st.subheader("📋 REGISTRO DE ERRORES")
+    mostrar_errores()
 
 def render_modulo(titulo, datos, session_key):
     st.markdown(f'<div class="main-header"><h1>{titulo}</h1></div>', unsafe_allow_html=True)
@@ -153,45 +252,29 @@ def render_modulo(titulo, datos, session_key):
             st.download_button("📥 Descargar Excel", data=excel_data, file_name=f"{session_key}_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
 def render_chat_ia():
-    st.markdown('<div class="main-header"><h1>💬 Chat IA</h1><p>Asistente virtual - Escribe tu pregunta</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>💬 Chat IA</h1><p>Puedes copiar y pegar errores aquí para analizarlos</p></div>', unsafe_allow_html=True)
     
-    # Función local para IA solo en el chat
-    def call_groq_only(prompt):
-        try:
-            key = st.secrets.get("GROQ_API_KEY")
-            if not key:
-                return "⚠️ No hay API key de Groq configurada"
-            
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-            data = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7
-            }
-            r = requests.post(url, json=data, headers=headers, timeout=30)
-            if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"]
-            else:
-                return f"Error {r.status_code}: {r.text[:100]}"
-        except Exception as e:
-            return f"Error: {str(e)}"
+    # Mostrar errores recientes para copiar
+    if st.session_state.error_list:
+        with st.expander("📋 Últimos errores (copia el que quieras analizar)"):
+            for err in st.session_state.error_list[-5:]:
+                st.code(f"[{err['timestamp']}] {err['message']}\n{err['detail'][:500] if err['detail'] else ''}")
     
     if not st.session_state.chat_messages:
-        st.session_state.chat_messages = [{"role": "assistant", "content": "Hola, soy tu asistente SST. Uso Groq para responder. ¿En qué puedo ayudarte?"}]
+        st.session_state.chat_messages = [{"role": "assistant", "content": "Hola, soy tu asistente SST. Si tienes un error, cópialo de arriba y pégalo aquí para analizarlo."}]
     
     for msg in st.session_state.chat_messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if prompt := st.chat_input("Pregunta sobre SST..."):
+    if prompt := st.chat_input("Escribe tu pregunta o pega un error..."):
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Consultando IA..."):
-                respuesta = call_groq_only(prompt)
+            with st.spinner("Analizando..."):
+                respuesta = call_groq(prompt)
                 st.write(respuesta)
                 st.session_state.chat_messages.append({"role": "assistant", "content": respuesta})
 
@@ -218,11 +301,11 @@ def render_indicadores():
     with col2:
         st.metric("Trabajadores", total)
 
-# ========== RUTEO ==========
+# ========== RUTEO CON CAPTURA ==========
 if menu == "Dashboard":
-    render_dashboard()
+    safe_render(render_dashboard, "Dashboard")
 elif menu == "Empresa":
-    st.markdown('<div class="main-header"><h1>🏢 Configuración</h1></div>', unsafe_allow_html=True)
+    safe_render(lambda: st.markdown('<div class="main-header"><h1>🏢 Configuración</h1></div>', unsafe_allow_html=True) or None, "Empresa")
     with st.form("empresa_form"):
         nombre = st.text_input("Nombre", value=st.session_state.empresa["nombre"])
         nit = st.text_input("NIT", value=st.session_state.empresa["nit"])
@@ -231,19 +314,19 @@ elif menu == "Empresa":
             st.session_state.empresa["nit"] = nit
             st.success("✅ Guardado")
 elif menu == "Peligros":
-    render_modulo("⚠️ Peligros", st.session_state.peligros, "peligros")
+    safe_render(lambda: render_modulo("⚠️ Peligros", st.session_state.peligros, "peligros"), "Peligros")
 elif menu == "Plan de Acción":
-    render_modulo("✅ Plan de Acción", st.session_state.acciones, "acciones")
+    safe_render(lambda: render_modulo("✅ Plan de Acción", st.session_state.acciones, "acciones"), "Plan de Acción")
 elif menu == "Trabajadores":
-    render_modulo("👥 Trabajadores", st.session_state.trabajadores, "trabajadores")
+    safe_render(lambda: render_modulo("👥 Trabajadores", st.session_state.trabajadores, "trabajadores"), "Trabajadores")
 elif menu == "Incidentes":
-    render_modulo("📝 Incidentes", st.session_state.incidentes, "incidentes")
+    safe_render(lambda: render_modulo("📝 Incidentes", st.session_state.incidentes, "incidentes"), "Incidentes")
 elif menu == "Matriz Legal":
-    render_matriz_legal()
+    safe_render(render_matriz_legal, "Matriz Legal")
 elif menu == "Auditorías":
     st.info("Módulo de auditorías - En desarrollo")
 elif menu == "Capacitaciones":
-    render_modulo("📚 Capacitaciones", st.session_state.capacitaciones, "capacitaciones")
+    safe_render(lambda: render_modulo("📚 Capacitaciones", st.session_state.capacitaciones, "capacitaciones"), "Capacitaciones")
 elif menu == "Inspecciones":
     st.info("Módulo de inspecciones - En desarrollo")
 elif menu == "Emergencias":
@@ -251,11 +334,11 @@ elif menu == "Emergencias":
 elif menu == "Documentos":
     st.info("Módulo de documentos - En desarrollo")
 elif menu == "Indicadores":
-    render_indicadores()
+    safe_render(render_indicadores, "Indicadores")
 elif menu == "Chat IA":
-    render_chat_ia()
+    safe_render(render_chat_ia, "Chat IA")
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
 
-# NO_AUTO_IA - 06/11/2026 09:44:00
+# ERROR_LOG - 06/11/2026 09:47:15
