@@ -32,6 +32,65 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 
+# ========== INICIALIZACIÓN SEGURA DE SESSION STATE ==========
+def init_session():
+    """Inicializar todas las variables de session_state de forma segura"""
+    if "auth" not in st.session_state:
+        st.session_state.auth = False
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "username" not in st.session_state:
+        st.session_state.username = None
+    if "user_role" not in st.session_state:
+        st.session_state.user_role = None
+    
+    # Datos de la empresa
+    if "empresa" not in st.session_state:
+        st.session_state.empresa = {"nombre": "Constructora Segura SAS", "nit": "901.234.567-8"}
+    
+    # Datos de los módulos
+    if "peligros" not in st.session_state:
+        st.session_state.peligros = [
+            {"id": 1, "tipo": "Físico", "descripcion": "Ruido excesivo", "probabilidad": 4, "severidad": 3, "nivel": "I", "fecha": "2024-01-15"},
+            {"id": 2, "tipo": "Ergonómico", "descripcion": "Posturas forzadas", "probabilidad": 3, "severidad": 2, "nivel": "II", "fecha": "2024-01-20"},
+        ]
+    
+    if "acciones" not in st.session_state:
+        st.session_state.acciones = [
+            {"id": 1, "descripcion": "Implementar barreras acústicas", "responsable": "SST", "fecha_limite": "2024-12-15", "estado": "Pendiente", "prioridad": "Alta"},
+            {"id": 2, "descripcion": "Capacitación en pausas activas", "responsable": "SST", "fecha_limite": "2024-11-30", "estado": "Pendiente", "prioridad": "Media"},
+        ]
+    
+    if "trabajadores" not in st.session_state:
+        st.session_state.trabajadores = [
+            {"id": 1, "nombre": "Carlos López", "cedula": "12345678", "cargo": "Operario", "area": "Producción"},
+            {"id": 2, "nombre": "María Gómez", "cedula": "87654321", "cargo": "Supervisor", "area": "Producción"},
+        ]
+    
+    if "incidentes" not in st.session_state:
+        st.session_state.incidentes = [
+            {"id": 1, "descripcion": "Caída desde andamio", "fecha": "2024-10-15", "gravedad": "Grave", "tipo": "Accidente"},
+            {"id": 2, "descripcion": "Corte con herramienta", "fecha": "2024-10-20", "gravedad": "Leve", "tipo": "Incidente"},
+        ]
+    
+    if "capacitaciones" not in st.session_state:
+        st.session_state.capacitaciones = []
+    
+    if "inspecciones" not in st.session_state:
+        st.session_state.inspecciones = []
+    
+    if "emergencias" not in st.session_state:
+        st.session_state.emergencias = {"brigadistas": [], "equipos": [], "alertas": []}
+    
+    if "documentos" not in st.session_state:
+        st.session_state.documentos = []
+    
+    if "auditorias" not in st.session_state:
+        st.session_state.auditorias = []
+    
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
 # ========== CONFIGURACIÓN DE IA ==========
 def get_all_gemini_keys():
     keys = []
@@ -70,14 +129,14 @@ def exportar_excel(data, nombre):
         df.to_excel(writer, sheet_name=nombre, index=False)
     return output.getvalue()
 
-def importar_excel(uploaded_file, tipo, session_key):
+def importar_excel(uploaded_file, tipo):
     try:
         df = pd.read_excel(uploaded_file)
         if tipo == "peligros":
             for _, row in df.iterrows():
                 nivel = "I" if row['probabilidad'] * row['severidad'] >= 6 else "II" if row['probabilidad'] * row['severidad'] >= 4 else "III"
-                nuevo_id = len(st.session_state[session_key]) + 1
-                st.session_state[session_key].append({
+                nuevo_id = len(st.session_state.peligros) + 1
+                st.session_state.peligros.append({
                     "id": nuevo_id,
                     "tipo": row['tipo'],
                     "descripcion": row['descripcion'],
@@ -86,57 +145,13 @@ def importar_excel(uploaded_file, tipo, session_key):
                     "nivel": nivel,
                     "fecha": datetime.now().strftime("%Y-%m-%d")
                 })
-            return True, f"✅ {len(df)} registros importados"
+            return True, f"✅ {len(df)} peligros importados"
         return False, "Formato no soportado"
     except Exception as e:
         return False, f"Error: {str(e)}"
 
-# ========== INICIALIZAR DATOS ==========
-def init_data():
-    if "auth" not in st.session_state:
-        st.session_state.auth = False
-    if "user_name" not in st.session_state:
-        st.session_state.user_name = None
-    
-    if "empresa" not in st.session_state:
-        st.session_state.empresa = {"nombre": "Constructora Segura SAS", "nit": "901.234.567-8"}
-    
-    if "peligros" not in st.session_state:
-        st.session_state.peligros = [
-            {"id": 1, "tipo": "Físico", "descripcion": "Ruido excesivo", "probabilidad": 4, "severidad": 3, "nivel": "I", "fecha": "2024-01-15"},
-        ]
-    
-    if "acciones" not in st.session_state:
-        st.session_state.acciones = [
-            {"id": 1, "descripcion": "Implementar barreras", "responsable": "SST", "fecha_limite": "2024-12-15", "estado": "Pendiente", "prioridad": "Alta"},
-        ]
-    
-    if "trabajadores" not in st.session_state:
-        st.session_state.trabajadores = [
-            {"id": 1, "nombre": "Carlos López", "cedula": "12345678", "cargo": "Operario", "area": "Producción"},
-        ]
-    
-    if "incidentes" not in st.session_state:
-        st.session_state.incidentes = [
-            {"id": 1, "descripcion": "Caída desde andamio", "fecha": "2024-10-15", "gravedad": "Grave", "tipo": "Accidente"},
-        ]
-    
-    if "capacitaciones" not in st.session_state:
-        st.session_state.capacitaciones = []
-    
-    if "inspecciones" not in st.session_state:
-        st.session_state.inspecciones = []
-    
-    if "emergencias" not in st.session_state:
-        st.session_state.emergencias = {"brigadistas": [], "equipos": [], "alertas": []}
-    
-    if "documentos" not in st.session_state:
-        st.session_state.documentos = []
-    
-    if "auditorias" not in st.session_state:
-        st.session_state.auditorias = []
-
-init_data()
+# ========== INICIALIZAR ==========
+init_session()
 
 # ========== LOGIN ==========
 if not st.session_state.auth:
@@ -156,7 +171,9 @@ if not st.session_state.auth:
             if st.form_submit_button("🚀 INGRESAR", use_container_width=True):
                 if username == "admin" and password == "admin123":
                     st.session_state.auth = True
-                    st.session_state.user_name = "Administrador"
+                    st.session_state.logged_in = True
+                    st.session_state.username = "Administrador"
+                    st.session_state.user_role = "admin"
                     st.rerun()
                 else:
                     st.error("❌ Usuario o contraseña incorrectos")
@@ -164,13 +181,22 @@ if not st.session_state.auth:
         st.markdown('<p style="text-align:center; font-size:11px; color:gray">SG-SST PHVA | JAN BENITEZ</p>', unsafe_allow_html=True)
     st.stop()
 
-# ========== SIDEBAR SEGURO ==========
+# ========== VERIFICACIÓN DE SESIÓN ==========
+# Asegurar que las variables existen después del login
+if st.session_state.auth:
+    if "username" not in st.session_state or st.session_state.username is None:
+        st.session_state.username = "Administrador"
+    if "user_role" not in st.session_state or st.session_state.user_role is None:
+        st.session_state.user_role = "admin"
+
+# ========== SIDEBAR ==========
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2917/2917995.png", width=50)
-    # Usar user_name en lugar de current_user
-    nombre_usuario = st.session_state.user_name if st.session_state.user_name else "Usuario"
-    st.markdown(f"### {nombre_usuario}")
-    st.caption("Administrador")
+    
+    # Mostrar nombre de usuario de forma segura
+    nombre_display = st.session_state.username if st.session_state.username else "Usuario"
+    st.markdown(f"### {nombre_display}")
+    st.caption(f"Rol: {st.session_state.user_role if st.session_state.user_role else 'admin'}")
     st.markdown("---")
     
     menu = st.radio("📋 MÓDULOS", [
@@ -178,29 +204,31 @@ with st.sidebar:
         "Trabajadores", "Incidentes", "Matriz Legal", "Auditorías",
         "Capacitaciones", "Inspecciones", "Emergencias", "Documentos",
         "Indicadores", "Chat IA"
-    ])
+    ], key="menu_selector")
     
     st.markdown("---")
     if st.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.auth = False
-        st.session_state.user_name = None
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.session_state.user_role = None
         st.rerun()
 
-# ========== FUNCIÓN PARA MÓDULOS ==========
+# ========== FUNCIÓN PARA MÓDULOS CON IMPORTAR/EXPORTAR ==========
 def render_modulo(titulo, datos, session_key, columnas_required):
     st.markdown(f'<div class="main-header"><h1>{titulo}</h1></div>', unsafe_allow_html=True)
     
     tab1, tab2, tab3 = st.tabs(["📋 Lista", "📥 Exportar", "📎 Importar Excel"])
     
     with tab1:
-        if datos:
+        if datos and len(datos) > 0:
             df = pd.DataFrame(datos)
             st.dataframe(df, use_container_width=True)
         else:
             st.info("No hay datos registrados")
     
     with tab2:
-        if datos:
+        if datos and len(datos) > 0:
             excel_data = exportar_excel(datos, session_key)
             st.download_button("📥 Descargar Excel", data=excel_data, file_name=f"{session_key}_{datetime.now().strftime('%Y%m%d')}.xlsx")
         else:
@@ -211,7 +239,7 @@ def render_modulo(titulo, datos, session_key, columnas_required):
         uploaded = st.file_uploader("Selecciona archivo Excel", type=['xlsx', 'xls'], key=f"import_{session_key}")
         if uploaded:
             if st.button("📤 Importar datos", use_container_width=True):
-                success, msg = importar_excel(uploaded, session_key, session_key)
+                success, msg = importar_excel(uploaded, session_key)
                 if success:
                     st.success(msg)
                     st.rerun()
@@ -233,11 +261,10 @@ if menu == "Dashboard":
     with col4:
         st.metric("📝 Incidentes", len(st.session_state.incidentes))
     
-    # Test IA
     with st.expander("🤖 Prueba de IA"):
-        if st.button("Probar IA"):
+        if st.button("Probar Conexión IA"):
             with st.spinner("Consultando IA..."):
-                res = call_best_ia("Responde: IA funcionando")
+                res = call_best_ia("Responde: IA funcionando correctamente")
                 st.write(res)
 
 elif menu == "Empresa":
@@ -313,7 +340,7 @@ elif menu == "Indicadores":
 elif menu == "Chat IA":
     st.markdown('<div class="main-header"><h1>💬 Chat IA</h1></div>', unsafe_allow_html=True)
     
-    if "chat_messages" not in st.session_state:
+    if not st.session_state.chat_messages:
         st.session_state.chat_messages = [{"role": "assistant", "content": "Hola, soy tu asistente SST. ¿En qué puedo ayudarte?"}]
     
     for msg in st.session_state.chat_messages:
@@ -331,4 +358,4 @@ elif menu == "Chat IA":
 st.markdown("---")
 st.markdown("<p style='text-align:center; font-size:11px; color:gray'>SG-SST PHVA | JAN BENITEZ</p>", unsafe_allow_html=True)
 
-# FIXED - 06/11/2026 08:44:00
+# ROBUSTO - 06/11/2026 08:45:46
