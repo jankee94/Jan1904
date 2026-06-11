@@ -10,9 +10,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ========== IA CON MODELOS ACTIVOS ==========
+# ========== IA CON MODELO ESTABLE ==========
 
-# Gemini - modelo activo: gemini-2.0-flash-exp
+# Gemini - modelo más estable: gemini-1.5-flash (debería funcionar)
 def call_gemini():
     try:
         key = st.secrets.get("GEMINI_API_KEY_1")
@@ -21,39 +21,58 @@ def call_gemini():
         if not key:
             return "No hay Gemini key"
         
-        # Modelo activo de Gemini
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
-        headers = {"Content-Type": "application/json", "x-goog-api-key": key}
-        data = {"contents": [{"parts": [{"text": "Responde solo: OK"}]}]}
+        # Intentar con múltiples modelos hasta que uno funcione
+        modelos = [
+            "gemini-1.5-flash",
+            "gemini-1.5-pro", 
+            "gemini-pro-vision",
+            "gemini-pro"
+        ]
         
-        r = requests.post(url, json=data, headers=headers, timeout=30)
+        for modelo in modelos:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+            data = {"contents": [{"parts": [{"text": "Responde solo: OK"}]}]}
+            
+            try:
+                r = requests.post(url, json=data, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    return f"✅ Gemini ({modelo}): {texto}"
+            except:
+                continue
         
-        if r.status_code == 200:
-            texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return f"✅ Gemini: {texto}"
-        else:
-            return f"❌ Error {r.status_code}: {r.text[:150]}"
+        return f"❌ Error: No se encontró modelo válido. Prueba con: {modelos}"
     except Exception as e:
         return f"❌ Error: {e}"
 
-# Groq - modelo activo: llama-3.3-70b-specdec
+# Groq - modelos activos
 def call_groq():
     try:
         key = st.secrets.get("GROQ_API_KEY")
         if not key:
             return "No hay Groq key"
         
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        data = {"model": "llama-3.3-70b-specdec", "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
+        modelos_groq = [
+            "llama3-70b-8192",
+            "llama3-8b-8192",
+            "mixtral-8x7b-32768"
+        ]
         
-        r = requests.post(url, json=data, headers=headers, timeout=30)
+        for modelo in modelos_groq:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            data = {"model": modelo, "messages": [{"role": "user", "content": "Responde solo: OK"}], "temperature": 0.7}
+            
+            try:
+                r = requests.post(url, json=data, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    texto = r.json()["choices"][0]["message"]["content"]
+                    return f"✅ Groq ({modelo}): {texto}"
+            except:
+                continue
         
-        if r.status_code == 200:
-            texto = r.json()["choices"][0]["message"]["content"]
-            return f"✅ Groq: {texto}"
-        else:
-            return f"❌ Error {r.status_code}: {r.text[:150]}"
+        return f"❌ Error: No se encontró modelo válido"
     except Exception as e:
         return f"❌ Error: {e}"
 
@@ -63,16 +82,22 @@ def chat_gemini(pregunta):
         if not key:
             key = st.secrets.get("GEMINI_API_KEY")
         
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
-        headers = {"Content-Type": "application/json", "x-goog-api-key": key}
-        data = {"contents": [{"parts": [{"text": f"Eres un experto en Seguridad y Salud en el Trabajo (SST) en Colombia. Responde de forma clara y profesional: {pregunta}"}]}]}
+        # Probar con modelos en orden
+        modelos = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
         
-        r = requests.post(url, json=data, headers=headers, timeout=30)
+        for modelo in modelos:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+            headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+            data = {"contents": [{"parts": [{"text": f"Eres un experto en SST. Responde: {pregunta}"}]}]}
+            
+            try:
+                r = requests.post(url, json=data, headers=headers, timeout=30)
+                if r.status_code == 200:
+                    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            except:
+                continue
         
-        if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            return f"Error: {r.status_code}"
+        return "Error: No se pudo conectar con Gemini"
     except Exception as e:
         return f"Error: {e}"
 
@@ -106,11 +131,12 @@ if menu == "Dashboard":
     st.markdown('<div class="main-header"><h1>Dashboard</h1></div>', unsafe_allow_html=True)
     
     st.subheader("🤖 Prueba de API Keys")
+    st.caption("El sistema probará automáticamente varios modelos hasta encontrar uno que funcione")
     
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔌 Probar Gemini", use_container_width=True):
-            with st.spinner("Probando Gemini..."):
+            with st.spinner("Probando modelos de Gemini..."):
                 r = call_gemini()
                 if "✅" in r:
                     st.success(r)
@@ -119,7 +145,7 @@ if menu == "Dashboard":
                     st.error(r)
     with col2:
         if st.button("🔌 Probar Groq", use_container_width=True):
-            with st.spinner("Probando Groq..."):
+            with st.spinner("Probando modelos de Groq..."):
                 r = call_groq()
                 if "✅" in r:
                     st.success(r)
@@ -128,7 +154,7 @@ if menu == "Dashboard":
                     st.error(r)
     
     st.markdown("---")
-    st.info("Gemini: gemini-2.0-flash-exp | Groq: llama-3.3-70b-specdec")
+    st.info("El sistema probará múltiples modelos automáticamente hasta encontrar uno que funcione")
 
 elif menu == "Chat IA":
     st.markdown('<div class="main-header"><h1>Chat IA</h1></div>', unsafe_allow_html=True)
